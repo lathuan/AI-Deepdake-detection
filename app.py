@@ -9,7 +9,8 @@ import cv2
 import numpy as np
 
 # Import hàm AI
-from ai_model.predict_video import predict_video_flask
+from predict_video import predict_video
+
 
 BASE_DIR = Path(__file__).parent
 UPLOAD_FOLDER = BASE_DIR / "uploads"
