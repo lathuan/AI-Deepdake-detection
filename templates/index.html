@@ -1,0 +1,557 @@
+<<<<<<< HEAD
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Deepfake Detector - Phát hiện Deepfake AI</title>
+    <!-- Tải Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Cấu hình Tailwind cho font Inter -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117; /* Nền tối */
+            color: #ffffff;
+        }
+        .card {
+            background-color: #161b22; /* Thẻ tối hơn */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+            transition: transform 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+        }
+        .btn-primary {
+            background-color: #2e7d32; /* Màu xanh lá cây đậm */
+            color: white;
+            transition: background-color 0.3s;
+        }
+        .btn-primary:hover {
+            background-color: #1b5e20;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    
+    <!-- Header & Navigation -->
+    <header class="bg-[#161b22] shadow-lg sticky top-0 z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <h1 class="text-3xl font-extrabold text-[#4caf50]">
+                AI <span class="text-white">Deepfake Detector</span>
+            </h1>
+            <nav class="space-x-4 flex items-center" id="nav-auth">
+                <a href="#how-it-works" class="text-gray-300 hover:text-[#4caf50] transition duration-150 hidden sm:inline">Cách hoạt động</a>
+                <a href="#pricing" class="text-gray-300 hover:text-[#4caf50] transition duration-150 hidden sm:inline">Giá</a>
+                <!-- Phần chưa đăng nhập -->
+                <div id="login-section" class="space-x-4 flex items-center">
+                    <a href="login.html" class="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg text-sm transition duration-150">
+                        Đăng nhập
+                    </a>
+                    <a href="register.html" class="btn-primary font-semibold py-2 px-4 rounded-lg text-sm">
+                        Đăng ký
+                    </a>
+                </div>
+                <!-- Phần đã đăng nhập (ẩn ban đầu) -->
+                <div id="profile-section" class="hidden flex items-center space-x-2">
+                    <div class="relative">
+                        <button id="profile-dropdown-btn" class="flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg text-sm transition duration-150">
+                            <img src="{{ session.avatar or 'https://placehold.co/32x32/4caf50/white?text=U' }}" alt="Avatar" class="w-8 h-8 rounded-full object-cover">
+                            <span id="user-name" class="hidden sm:inline">{{ session.email }}</span>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        <!-- Dropdown menu -->
+                        <div id="profile-dropdown" class="absolute right-0 mt-2 w-48 bg-[#161b22] rounded-md shadow-lg py-1 hidden border border-gray-700 z-20">
+                            <a href="profile.html" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Hồ sơ</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Cài đặt</a>
+                            <hr class="my-1 border-gray-600">
+                            <button id="logout-btn" class="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">Đăng xuất</button>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+
+        <!-- Phần CTA Chính -->
+        <section class="text-center mb-20">
+            <h2 class="text-5xl md:text-6xl font-black mb-4 leading-tight">
+                Phát hiện  <span class="text-[#4caf50]">video Deepfake</span>.
+            </h2>
+            <p class="text-xl text-gray-400 mb-8 max-w-3xl mx-auto">
+                Sử dụng công nghệ AI tiên tiến để phát hiện deepfake chất lượng cao chỉ trong vài phút. Không cần kỹ năng phân tích phức tạp.
+            </p>
+            <div class="space-y-4 sm:space-y-0 sm:space-x-6">
+                <a href="#editor" class="btn-primary text-lg font-bold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl transition duration-300 transform hover:scale-105 inline-block">
+                    Bắt đầu Phát hiện ngay!
+                </a>
+                <a href="#how-it-works" class="bg-gray-700 hover:bg-gray-600 text-white text-lg font-bold py-3 px-8 rounded-xl shadow-lg transition duration-300 transform hover:scale-105 inline-block">
+                    Xem demo
+                </a>
+            </div>
+        </section>
+
+        <!-- Hướng dẫn (How It Works) -->
+        <section id="how-it-works" class="mb-20">
+            <h3 class="text-4xl font-bold text-center mb-10 border-b-2 border-[#4caf50] pb-3 mx-auto max-w-md">
+                Cách hoạt động
+            </h3>
+            <div class="grid md:grid-cols-3 gap-8 text-center">
+                <div class="card p-6 rounded-xl border border-gray-700">
+                    <div class="text-[#4caf50] text-5xl mb-4 font-extrabold">1</div>
+                    <h4 class="text-2xl font-semibold mb-3">Tải lên Video Cần Kiểm Tra</h4>
+                    <p class="text-gray-400">Cung cấp video nghi ngờ deepfake để AI phân tích các dấu hiệu bất thường.</p>
+                </div>
+                <div class="card p-6 rounded-xl border border-gray-700">
+                    <div class="text-[#4caf50] text-5xl mb-4 font-extrabold">2</div>
+                    <h4 class="text-2xl font-semibold mb-3">Chọn Khuôn Mặt Nghi Ngờ</h4>
+                    <p class="text-gray-400">AI tự động quét và xác định các khuôn mặt chính trong video.</p>
+                </div>
+                <div class="card p-6 rounded-xl border border-gray-700">
+                    <div class="text-[#4caf50] text-5xl mb-4 font-extrabold">3</div>
+                    <h4 class="text-2xl font-semibold mb-3">Phân Tích & Báo Cáo</h4>
+                    <p class="text-gray-400">Bấm nút, chờ AI xử lý, và nhận báo cáo chi tiết về khả năng deepfake!</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Giao diện Trình chỉnh sửa (Mock Editor) -->
+        <section id="editor" class="mb-20">
+            <h3 class="text-4xl font-bold mb-8">
+                Phòng thí nghiệm Phát hiện Deepfake (Cân bằng: <span id="credit-count">50</span> Tín dụng)
+            </h3>
+
+            <div class="grid lg:grid-cols-3 gap-8">
+                <!-- Cột Trình chỉnh sửa/Tải lên -->
+                <div class="lg:col-span-2 space-y-8">
+                    <!-- Tải lên Video Cần Kiểm Tra -->
+                    <div class="card p-6 rounded-xl border border-gray-700">
+                        <h4 class="text-xl font-semibold mb-4 text-[#4caf50]">1. Video Cần Kiểm Tra (Đã tải lên: video.mp4)</h4>
+                        <div class="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
+                            <p class="text-gray-400">Chọn video rõ ràng để AI phân tích các dấu hiệu deepfake như bất thường khuôn mặt, cử động môi.</p>
+                            <button class="bg-blue-600 hover:bg-blue-500 text-white py-2 px-4 rounded-lg transition duration-150 w-full sm:w-auto">
+                                Tải lên Video
+                            </button>
+                        </div>
+                        <div class="mt-4 aspect-video bg-[#0d1117] rounded-lg flex items-center justify-center">
+                            <span class="text-gray-500 text-lg">Khung xem trước video cần kiểm tra (5s)</span>
+                        </div>
+                    </div>
+
+                    <!-- Tùy chọn Phân tích Nâng cao -->
+                    <div class="card p-6 rounded-xl border border-gray-700">
+                        <h4 class="text-xl font-semibold mb-4 text-[#4caf50]">2. Tùy chọn Phân tích (Tự động: Cao)</h4>
+                        <div class="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
+                            <p class="text-gray-400">Chọn mức độ chi tiết: Tiêu chuẩn hoặc Nâng cao để phát hiện deepfake tinh vi.</p>
+                            <button class="bg-blue-600 hover:bg-blue-500 text-white py-2 px-4 rounded-lg transition duration-150 w-full sm:w-auto">
+                                Cấu hình Nâng cao
+                            </button>
+                        </div>
+                        <div class="mt-4 flex space-x-2 overflow-x-auto p-2 bg-[#0d1117] rounded">
+                            <!-- Ảnh giả lập dấu hiệu deepfake -->
+                            <img src="https://placehold.co/60x60/ff6b6b/white?text=Eye" alt="Dấu hiệu mắt" class="rounded-lg h-16 w-16 object-cover">
+                            <img src="https://placehold.co/60x60/ff6b6b/white?text=Lip" alt="Dấu hiệu môi" class="rounded-lg h-16 w-16 object-cover">
+                            <img src="https://placehold.co/60x60/ff6b6b/white?text=Skin" alt="Dấu hiệu da" class="rounded-lg h-16 w-16 object-cover">
+                        </div>
+                    </div>
+
+                    <!-- Nút Bắt đầu Job -->
+                    <button id="start-job-btn" class="btn-primary text-xl font-bold py-4 px-8 rounded-xl w-full transition duration-300">
+                        BẮT ĐẦU PHÂN TÍCH DEEPFAKE (Cần 5 Tín dụng)
+                    </button>
+                </div>
+
+                <!-- Cột Hàng đợi Công việc -->
+                <div class="lg:col-span-1">
+                    <div class="card p-6 rounded-xl border border-gray-700 h-full">
+                        <h4 class="text-xl font-semibold mb-4 text-white">Hàng đợi Phân tích & Kết quả</h4>
+                        <div id="job-queue" class="space-y-4">
+                            <!-- Job giả lập hiện tại -->
+                            <div class="job-item p-4 rounded-lg bg-gray-800 border-l-4 border-yellow-500">
+                                <p class="font-medium text-yellow-400">Job #12345</p>
+                                <p class="text-sm text-gray-400">Video: clip_test.mp4</p>
+                                <div class="mt-2 text-sm">
+                                    <p class="text-yellow-500 font-semibold mb-1">Đang phân tích (75% hoàn thành)</p>
+                                    <div class="w-full bg-gray-700 rounded-full h-2.5">
+                                        <div class="bg-yellow-500 h-2.5 rounded-full" style="width: 75%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Job giả lập đã hoàn thành -->
+                            <div class="job-item p-4 rounded-lg bg-gray-800 border-l-4 border-green-500">
+                                <p class="font-medium text-green-400">Job #12344</p>
+                                <p class="text-sm text-gray-400">Video: old_vid.mp4</p>
+                                <div class="mt-2 flex justify-between items-center">
+                                    <span class="text-green-500 font-semibold">Hoàn thành! (Deepfake: 92%)</span>
+                                    <button class="bg-green-600 hover:bg-green-500 text-white py-1 px-3 rounded-md text-sm" onclick="alertModal('Tải Báo Cáo', 'Đang giả lập tải xuống báo cáo PDF...')">
+                                        Tải Báo Cáo
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <p id="no-jobs-msg" class="text-center text-gray-500 mt-6 hidden">Không có công việc nào trong hàng đợi.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Phần Giá (Pricing) -->
+        <section id="pricing" class="mb-20">
+            <h3 class="text-4xl font-bold text-center mb-12 border-b-2 border-[#4caf50] pb-3 mx-auto max-w-md">
+                Giá cả & Gói Tín dụng
+            </h3>
+
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Gói Cơ bản -->
+                <div class="card p-8 rounded-xl border border-gray-700 text-center">
+                    <h4 class="text-2xl font-bold mb-2 text-gray-300">Gói Cơ bản</h4>
+                    <p class="text-5xl font-extrabold text-[#4caf50] mb-6">
+                        $10<span class="text-xl text-gray-400">/lần</span>
+                    </p>
+                    <p class="text-lg font-bold text-white mb-4">100 Tín dụng</p>
+                    <ul class="text-gray-400 space-y-2 text-left mx-auto max-w-xs mb-8">
+                        <li>✓ Độ chính xác tiêu chuẩn (85%+)</li>
+                        <li>✓ Thời gian phân tích tiêu chuẩn</li>
+                        <li>✓ Hỗ trợ 24 giờ</li>
+                        <li class="line-through">✗ Phân tích nâng cao</li>
+                    </ul>
+                    <button class="btn-primary font-bold py-3 px-8 rounded-lg w-full">
+                        Mua ngay
+                    </button>
+                </div>
+
+                <!-- Gói Pro (Phổ biến) -->
+                <div class="card p-8 rounded-xl border border-[#4caf50] text-center transform scale-105 shadow-2xl">
+                    <div class="bg-[#4caf50] text-black text-sm font-bold py-1 mb-3 rounded-full inline-block px-4">Phổ biến</div>
+                    <h4 class="text-2xl font-bold mb-2 text-white">Gói Pro</h4>
+                    <p class="text-5xl font-extrabold text-[#4caf50] mb-6">
+                        $50<span class="text-xl text-gray-400">/lần</span>
+                    </p>
+                    <p class="text-lg font-bold text-white mb-4">600 Tín dụng (+20% Bonus)</p>
+                    <ul class="text-gray-400 space-y-2 text-left mx-auto max-w-xs mb-8">
+                        <li>✓ Độ chính xác Cao (95%+)</li>
+                        <li>✓ Thời gian phân tích Nhanh</li>
+                        <li>✓ Hỗ trợ Ưu tiên</li>
+                        <li>✓ Phân tích Nâng cao (4K)</li>
+                    </ul>
+                    <button class="btn-primary font-bold py-3 px-8 rounded-lg w-full">
+                        Mua ngay
+                    </button>
+                </div>
+
+                <!-- Gói Cao cấp -->
+                <div class="card p-8 rounded-xl border border-gray-700 text-center">
+                    <h4 class="text-2xl font-bold mb-2 text-gray-300">Gói Cao cấp</h4>
+                    <p class="text-5xl font-extrabold text-[#4caf50] mb-6">
+                        $150<span class="text-xl text-gray-400">/lần</span>
+                    </p>
+                    <p class="text-lg font-bold text-white mb-4">2000 Tín dụng (Giá trị tốt nhất)</p>
+                    <ul class="text-gray-400 space-y-2 text-left mx-auto max-w-xs mb-8">
+                        <li>✓ Độ chính xác Ảo ảnh (99%+)</li>
+                        <li>✓ Thời gian phân tích Tức thì</li>
+                        <li>✓ Hỗ trợ VIP 24/7</li>
+                        <li>✓ Phân tích Tối đa (8K+)</li>
+                    </ul>
+                    <button class="btn-primary font-bold py-3 px-8 rounded-lg w-full">
+                        Mua ngay
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-[#161b22] py-8 mt-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-400">
+            <p>&copy; 2025 AI Deepfake Detector. Mọi quyền được bảo lưu.</p>
+            <div class="mt-4 space-x-4 text-sm">
+                <a href="#" class="hover:text-[#4caf50]">Điều khoản Dịch vụ</a>
+                <span class="text-gray-600">|</span>
+                <a href="#" class="hover:text-[#4caf50]">Chính sách Bảo mật</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript Mô phỏng -->
+    <script>
+        // Xử lý trạng thái đăng nhập
+        function checkLoginStatus() {
+            const isLoggedIn = localStorage.getItem('loggedIn') === 'true';
+            const userName = localStorage.getItem('userName') || 'Người dùng';
+            const userAvatar = localStorage.getItem('userAvatar') || 'https://placehold.co/32x32/4caf50/white?text=U';
+
+            const loginSection = document.getElementById('login-section');
+            const profileSection = document.getElementById('profile-section');
+            const userNameEl = document.getElementById('user-name');
+            const avatarImg = document.querySelector('#profile-dropdown-btn img');
+
+            if (isLoggedIn) {
+                loginSection.classList.add('hidden');
+                profileSection.classList.remove('hidden');
+                userNameEl.textContent = userName;
+                avatarImg.src = userAvatar;
+            } else {
+                loginSection.classList.remove('hidden');
+                profileSection.classList.add('hidden');
+            }
+        }
+
+        // Xử lý dropdown profile
+        const profileBtn = document.getElementById('profile-dropdown-btn');
+        const dropdown = document.getElementById('profile-dropdown');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        profileBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdown.classList.toggle('hidden');
+        });
+
+        document.addEventListener('click', () => {
+            dropdown.classList.add('hidden');
+        });
+
+        // Xử lý đăng xuất
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('loggedIn');
+            localStorage.removeItem('userName');
+            localStorage.removeItem('userAvatar');
+            checkLoginStatus();
+            alertModal('Đăng xuất', 'Bạn đã đăng xuất thành công.');
+        });
+
+        // Phần còn lại của script (job queue, etc.)
+        const startJobBtn = document.getElementById('start-job-btn');
+        const jobQueue = document.getElementById('job-queue');
+        const creditCountDisplay = document.getElementById('credit-count');
+
+        let currentCredit = 50;
+        let jobIdCounter = 12346;
+
+        // Hàm cập nhật số tín dụng
+        function updateCreditDisplay() {
+            creditCountDisplay.textContent = currentCredit;
+        }
+
+        // Hàm giả lập tạo công việc mới
+        function createNewJob() {
+            const cost = 5;
+            if (currentCredit < cost) {
+                alertModal("Lỗi Tín dụng", "Bạn không đủ 5 Tín dụng để bắt đầu phân tích. Vui lòng mua thêm tín dụng.");
+                return;
+            }
+
+            currentCredit -= cost;
+            updateCreditDisplay();
+
+            const newJobId = jobIdCounter++;
+            const newJobItem = document.createElement('div');
+            newJobItem.className = 'job-item p-4 rounded-lg bg-gray-800 border-l-4 border-yellow-500';
+            newJobItem.innerHTML = `
+                <p class="font-medium text-yellow-400">Job #${newJobId}</p>
+                <p class="text-sm text-gray-400">Video: new_video_${newJobId}.mp4</p>
+                <div class="mt-2 text-sm">
+                    <p class="text-yellow-500 font-semibold mb-1">Đang phân tích (<span class="progress-percent">0</span>% hoàn thành)</p>
+                    <div class="w-full bg-gray-700 rounded-full h-2.5">
+                        <div class="progress-bar bg-yellow-500 h-2.5 rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
+            `;
+            // Thêm job mới vào đầu danh sách (trên các job đã hoàn thành)
+            jobQueue.insertBefore(newJobItem, jobQueue.children[0]);
+
+            // Bắt đầu tiến trình giả lập
+            simulateProgress(newJobItem, newJobId);
+        }
+
+        // Hàm giả lập tiến trình
+        function simulateProgress(jobElement, jobId) {
+            let progress = 0;
+            const progressPercentElement = jobElement.querySelector('.progress-percent');
+            const progressBarElement = jobElement.querySelector('.progress-bar');
+
+            const interval = setInterval(() => {
+                progress += Math.floor(Math.random() * 5) + 1; // Tăng ngẫu nhiên
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                    completeJob(jobElement, jobId);
+                    const fakeScore = Math.floor(Math.random() * 20) + 80; // Giả lập điểm % deepfake
+                    alertModal("Thành công!", `Phân tích #${jobId} đã hoàn thành. Xác suất Deepfake: ${fakeScore}%.`);
+                }
+
+                progressPercentElement.textContent = progress;
+                progressBarElement.style.width = `${progress}%`;
+            }, 500); // Cập nhật mỗi 0.5 giây
+        }
+
+        // Hàm hoàn thành công việc
+        function completeJob(jobElement, jobId) {
+            const fakeScore = Math.floor(Math.random() * 20) + 80; // Giả lập điểm %
+            jobElement.className = 'job-item p-4 rounded-lg bg-gray-800 border-l-4 border-green-500';
+            jobElement.innerHTML = `
+                <p class="font-medium text-green-400">Job #${jobId}</p>
+                <p class="text-sm text-gray-400">Video: new_video_${jobId}.mp4</p>
+                <div class="mt-2 flex justify-between items-center">
+                    <span class="text-green-500 font-semibold">Hoàn thành! (Deepfake: ${fakeScore}%)</span>
+                    <button class="bg-green-600 hover:bg-green-500 text-white py-1 px-3 rounded-md text-sm" onclick="alertModal('Tải Báo Cáo', 'Đang giả lập tải xuống báo cáo PDF...')">
+                        Tải Báo Cáo
+                    </button>
+                </div>
+            `;
+        }
+
+        // Tạo Modal Giả lập (thay thế cho alert())
+        function alertModal(title, message) {
+            const modalId = 'custom-alert-modal';
+            let modal = document.getElementById(modalId);
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = modalId;
+                modal.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 transition-opacity duration-300 opacity-0 pointer-events-none';
+                modal.innerHTML = `
+                    <div class="bg-[#161b22] card p-6 rounded-xl max-w-sm mx-4 transform scale-90 transition-transform duration-300">
+                        <h5 class="text-2xl font-bold mb-3 text-[#4caf50] modal-title"></h5>
+                        <p class="text-gray-300 mb-6 modal-message"></p>
+                        <button class="btn-primary py-2 px-4 rounded-lg w-full modal-close-btn">Đóng</button>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+
+                const closeModal = () => {
+                    modal.classList.remove('opacity-100', 'pointer-events-auto');
+                    modal.querySelector('.card').classList.remove('scale-100');
+                    setTimeout(() => {
+                         // Có thể loại bỏ modal sau khi ẩn nếu muốn, nhưng giữ lại để tái sử dụng
+                    }, 300);
+                };
+
+                modal.querySelector('.modal-close-btn').addEventListener('click', closeModal);
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) closeModal();
+                });
+            }
+
+            modal.querySelector('.modal-title').textContent = title;
+            modal.querySelector('.modal-message').textContent = message;
+
+            // Hiển thị modal
+            setTimeout(() => {
+                modal.classList.add('opacity-100', 'pointer-events-auto');
+                modal.querySelector('.card').classList.add('scale-100');
+            }, 10);
+        }
+
+        // Listener cho nút bắt đầu công việc
+        startJobBtn.addEventListener('click', createNewJob);
+
+        // Khởi tạo trạng thái
+        window.onload = function() {
+            updateCreditDisplay();
+            checkLoginStatus(); // Kiểm tra đăng nhập khi load trang
+            // Xóa job giả lập đang chờ xử lý khi load lần đầu (để tránh nhầm lẫn)
+            const initialProcessingJob = jobQueue.querySelector('.border-yellow-500');
+            if (initialProcessingJob) {
+                initialProcessingJob.remove();
+            }
+        };
+
+    </script>
+    
+    <script>
+        setTimeout(() => {
+            document.querySelectorAll('.fixed.top-4').forEach(el => el.style.display = 'none');
+        }, 3000);
+    </script>
+</body>
+</html>
+=======
+{% extends "layout.html" %}
+{% block title %}Nhận diện khuôn mặt từ video{% endblock %}
+{% block content %}
+  <h1>Nhận diện khuôn mặt từ video</h1>
+
+  <div class="card">
+    <h3>Tài khoản</h3>
+    <input id="username" placeholder="username">
+    <input id="password" placeholder="password" type="password">
+    <button id="register">Đăng ký</button>
+    <button id="login">Đăng nhập</button>
+    <div id="authmsg" class="muted"></div>
+  </div>
+
+  <div class="card">
+    <h3>Chọn tệp video</h3>
+    <input id="fileInput" type="file" accept="video/*">
+    <button id="uploadBtn">Tải lên & Phân tích</button>
+    <p id="status" class="muted"></p>
+  </div>
+
+  <div class="card">
+    <h3>Kết quả:</h3>
+    <p id="result">Chưa có kết quả.</p>
+    <pre id="details" style="white-space:pre-wrap"></pre>
+    <video id="preview" controls style="max-width:100%;display:none"></video>
+  </div>
+
+<script>
+const fileInput = document.getElementById('fileInput');
+const uploadBtn = document.getElementById('uploadBtn');
+const statusEl = document.getElementById('status');
+const preview = document.getElementById('preview');
+const resultEl = document.getElementById('result');
+const detailsEl = document.getElementById('details');
+
+let selectedFile = null;
+fileInput.addEventListener('change', (e) => {
+  selectedFile = e.target.files[0];
+  if (!selectedFile) return;
+  preview.src = URL.createObjectURL(selectedFile);
+  preview.style.display = 'block';
+});
+
+uploadBtn.addEventListener('click', async () => {
+  if (!selectedFile) { alert('Hãy chọn file video trước.'); return; }
+  statusEl.textContent = 'Đang tải lên...';
+  const fd = new FormData();
+  fd.append('video', selectedFile);
+  const res = await fetch('/analyze', { method: 'POST', body: fd });
+  if (!res.ok) {
+    const text = await res.text();
+    statusEl.textContent = 'Lỗi: ' + (res.statusText || text);
+    return;
+  }
+  const data = await res.json();
+  statusEl.textContent = '';
+  resultEl.textContent = data.label || 'No label';
+  detailsEl.textContent = JSON.stringify(data, null, 2);
+  if (data.video_url) {
+    preview.src = data.video_url;
+    preview.style.display = 'block';
+  }
+});
+
+// Auth buttons
+document.getElementById('register').onclick = async () => {
+  const u = document.getElementById('username').value, p = document.getElementById('password').value;
+  const r = await fetch('/register', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({username: u, password: p})
+  });
+  const j = await r.json();
+  document.getElementById('authmsg').textContent = j.msg || JSON.stringify(j);
+};
+document.getElementById('login').onclick = async () => {
+  const u = document.getElementById('username').value, p = document.getElementById('password').value;
+  const r = await fetch('/login', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({username: u, password: p})
+  });
+  const j = await r.json();
+  document.getElementById('authmsg').textContent = j.msg || JSON.stringify(j);
+};
+</script>
+{% endblock %}
+>>>>>>> 4dcbb340d6fa2c28e827359c8fce6b5770b09cbd

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hồ Sơ - AI Deepfake Detector</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0d1117; color: #ffffff; }
+        .btn-primary { background-color: #2e7d32; color: white; transition: background-color 0.3s; }
+        .btn-primary:hover { background-color: #1b5e20; }
+    </style>
+</head>
+<body class="min-h-screen p-8">
+    <div class="max-w-md mx-auto bg-[#161b22] p-6 rounded-xl border border-gray-700">
+        <h1 class="text-3xl font-bold mb-6 text-center text-[#4caf50]">Hồ Sơ Tài Khoản</h1>
+        
+        <!-- Thông Tin Tài Khoản -->
+        <div class="mb-6 p-4 bg-gray-800 rounded-lg">
+            <h2 class="text-xl font-semibold mb-2 text-[#4caf50]">Thông Tin</h2>
+            <p><strong>Email:</strong> {{ user.email }}</p>
+            <p><strong>Ngày Lập:</strong> {{ created_date }}</p>
+            <img src="{{ user.avatar }}" alt="Avatar" class="w-24 h-24 rounded-full mx-auto mt-4 object-cover">
+        </div>
+
+        <!-- Form Thay Đổi Avatar -->
+        <form method="POST" enctype="multipart/form-data" class="mb-6">
+            <label class="block text-sm font-medium text-gray-400 mb-2">Thay Đổi Avatar</label>
+            <input type="file" name="avatar" accept="image/*" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded text-white mb-2">
+            <button type="submit" class="btn-primary py-2 px-4 rounded w-full">Cập Nhật Avatar</button>
+        </form>
+
+        <!-- Form Đổi Mật Khẩu -->
+        <form method="POST" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-1">Mật Khẩu Cũ</label>
+                <input type="password" name="old_password" required class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded text-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-1">Mật Khẩu Mới</label>
+                <input type="password" name="new_password" required minlength="6" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded text-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-1">Xác Nhận Mật Khẩu Mới</label>
+                <input type="password" name="confirm_password" required class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded text-white">
+            </div>
+            <button type="submit" class="btn-primary py-2 px-4 rounded w-full">Đổi Mật Khẩu</button>
+        </form>
+
+        <a href="index.html" class="block text-center text-[#4caf50] hover:text-green-400 mt-4">Quay Về Trang Chủ</a>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="fixed top-4 right-4 bg-{{ 'green-500' if category == 'success' else 'red-500' }} text-white px-4 py-2 rounded shadow-lg z-50">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <script>
+        // Ẩn flash sau 3s
+        setTimeout(() => {
+            document.querySelectorAll('.fixed.top-4').forEach(el => el.style.display = 'none');
+        }, 3000);
+    </script>
+</body>
+</html>
