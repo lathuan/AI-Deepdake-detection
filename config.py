@@ -1,27 +1,22 @@
 # config.py
 
-# --- Cấu hình Tập Dữ liệu (Phân loại Nhị phân: REAL/FAKE) ---
-# Tên các thư mục chứa ảnh khuôn mặt đã cắt, đặt trong thư mục 'processed_data/'
-DATA_FOLDERS = {
-    "real": 0,    # Nhãn số 0: Ảnh khuôn mặt thật
-    "fake": 1     # Nhãn số 1: Tất cả ảnh deepfake
-}
+# --- CẤU HÌNH DỮ LIỆU ---
+DATA_DIR = 'processed_data'
+BATCH_SIZE = 16 
 
-NUM_CLASSES = len(DATA_FOLDERS)  # Sẽ bằng 2
+# Kích thước đầu vào cho Nhánh Khuôn mặt (Face Stream)
+FACE_IMG_WIDTH = 320
+FACE_IMG_HEIGHT = 320
 
-# --- Cấu hình Ảnh Đầu vào ---
-IMG_WIDTH = 256
-IMG_HEIGHT = 256
-CHANNELS = 3
+# Kích thước đầu vào cho Nhánh Ngữ cảnh (Context Stream)
+CONTEXT_IMG_WIDTH = 224
+CONTEXT_IMG_HEIGHT = 224
 
-# --- Cấu hình Huấn luyện ---
-BATCH_SIZE = 32
-EPOCHS = 20  # Bạn có thể điều chỉnh số lượng epoch này
+# --- CẤU HÌNH HUẤN LUYỆN ---
+EPOCHS_WARMUP = 15    
+EPOCHS_FINETUNE = 50 
 VALIDATION_SPLIT = 0.2
-SEED = 42
 
-# --- Cấu hình Tên File Đầu ra ---
-MODEL_FILE = 'mesonet_binary_detector.h5' 
-HISTORY_FILE = 'mesonet_binary_history.csv' 
-OUTPUT_DIR = 'output'
-PROCESSED_DATA_DIR = 'processed_data'
+# --- CẤU HÌNH LƯU TRỮ ---
+MODEL_OUTPUT_DIR = 'output'
+MODEL_NAME = 'two_stream_xception_resnet.h5'

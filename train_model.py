@@ -1,99 +1,134 @@
 # train_model.py
 
+import os
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
-from sklearn.utils import class_weight
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
+from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
-import os
 import pandas as pd
-from config import (
-    DATA_FOLDERS, NUM_CLASSES, IMG_WIDTH, IMG_HEIGHT, CHANNELS, 
-    BATCH_SIZE, EPOCHS, VALIDATION_SPLIT, SEED, MODEL_FILE, 
-    HISTORY_FILE, OUTPUT_DIR, PROCESSED_DATA_DIR
-)
-from model_arch import create_mesonet
+
+# 1. IMPORT CẤU HÌNH VÀ KIẾN TRÚC
+from config import *
+from model_arch import create_two_stream_model, fine_tune_two_stream_model
 
 
-# Đảm bảo thư mục output tồn tại
-if not os.path.exists(OUTPUT_DIR):
-    os.makedirs(OUTPUT_DIR)
-
-def get_data_generator():
-    """Tạo ImageDataGenerator để tải và tăng cường dữ liệu."""
-    
-    # Tải dữ liệu từ thư mục processed_data/ và chia thành train/val
+# --- HÀM TẠO DATA GENERATOR CHO MÔ HÌNH HAI NHÁNH ---
+def get_two_stream_generator(data_dir, target_size_face, target_size_context, batch_size, subset, validation_split):
     datagen = ImageDataGenerator(
-        rescale=1./255,                 # Chuẩn hóa ảnh
-        validation_split=VALIDATION_SPLIT # Tỉ lệ chia validation
-        # Bạn có thể thêm các tham số data augmentation khác tại đây
+        rescale=1./255, # Chuẩn hóa
+        rotation_range=10, width_shift_range=0.1, height_shift_range=0.1, 
+        shear_range=0.1, zoom_range=0.1, horizontal_flip=True,
+        validation_split=validation_split
     )
-    
-    train_generator = datagen.flow_from_directory(
-        PROCESSED_DATA_DIR,
-        target_size=(IMG_HEIGHT, IMG_WIDTH),
-        color_mode="rgb",
-        batch_size=BATCH_SIZE,
-        class_mode='categorical',       # Cần categorical cho đầu ra softmax
-        subset='training',
-        seed=SEED
-    )
-    
-    validation_generator = datagen.flow_from_directory(
-        PROCESSED_DATA_DIR,
-        target_size=(IMG_HEIGHT, IMG_WIDTH),
-        color_mode="rgb",
-        batch_size=BATCH_SIZE,
-        class_mode='categorical',
-        subset='validation',
-        seed=SEED
-    )
-    
-    return train_generator, validation_generator
 
+    face_gen = datagen.flow_from_directory(
+        data_dir, target_size=target_size_face, batch_size=batch_size,
+        class_mode='categorical', subset=subset, seed=42
+    )
+
+    context_gen = datagen.flow_from_directory(
+        data_dir, target_size=target_size_context, batch_size=batch_size,
+        class_mode='categorical', subset=subset, seed=42
+    )
+    
+    while True:
+        X_face = face_gen.next()
+        X_context = context_gen.next()
+        
+        # Trả về dictionary cho hai đầu vào của mô hình
+        yield ({'face_input': X_face[0], 'context_input': X_context[0]}, X_face[1])
+
+
+# --- HÀM TÍNH TRỌNG SỐ LỚP (ĐÃ SỬA LỖI) ---
+def get_class_weights(data_dir, validation_split):
+    # Tạo generator cơ sở CHỈ để lấy các nhãn (classes) của tập huấn luyện
+    temp_gen_base = ImageDataGenerator(validation_split=validation_split).flow_from_directory(
+        data_dir, 
+        target_size=(FACE_IMG_WIDTH, FACE_IMG_HEIGHT), # Kích thước bất kỳ
+        batch_size=1, # Kích thước lô tối thiểu
+        subset='training', 
+        class_mode='categorical', 
+        shuffle=False # Quan trọng: Không xáo trộn để lấy đúng nhãn
+    )
+    
+    # Lấy các nhãn (classes) của tập huấn luyện
+    classes_labels = temp_gen_base.classes
+    unique_classes = np.unique(classes_labels)
+    
+    # Tính trọng số lớp
+    weights = compute_class_weight('balanced', classes=unique_classes, y=classes_labels)
+    class_weights = dict(zip(unique_classes, weights))
+    
+    print(f"Indices: {temp_gen_base.class_indices}")
+    print(f"Trọng số lớp được tính: {class_weights}")
+    return class_weights
+
+
+# --- HÀM CHÍNH ĐỂ HUẤN LUYỆN ---
 def train_model():
-    train_gen, val_gen = get_data_generator()
-    
-    # 1. Tính Class Weights (Quan trọng vì dữ liệu REAL/FAKE có thể không cân bằng)
-    # Lấy các nhãn số nguyên từ generator
-    labels = train_gen.classes
-    
-    weights = class_weight.compute_class_weight(
-        'balanced',
-        classes=np.unique(labels),
-        y=labels
+    # 1. TẠO DATA GENERATORS VÀ TÍNH TOÁN
+    train_gen = get_two_stream_generator(
+        data_dir=DATA_DIR, target_size_face=(FACE_IMG_WIDTH, FACE_IMG_HEIGHT),
+        target_size_context=(CONTEXT_IMG_WIDTH, CONTEXT_IMG_HEIGHT),
+        batch_size=BATCH_SIZE, subset='training', validation_split=VALIDATION_SPLIT
     )
-    class_weights = dict(zip(np.unique(labels), weights))
-    print(f"Trọng số lớp (Class Weights): {class_weights}")
+    
+    val_gen = get_two_stream_generator(
+        data_dir=DATA_DIR, target_size_face=(FACE_IMG_WIDTH, FACE_IMG_HEIGHT),
+        target_size_context=(CONTEXT_IMG_WIDTH, CONTEXT_IMG_HEIGHT),
+        batch_size=BATCH_SIZE, subset='validation', validation_split=VALIDATION_SPLIT
+    )
 
-    # 2. Tạo mô hình và Compile
-    model = create_mesonet(IMG_WIDTH, IMG_HEIGHT, CHANNELS, NUM_CLASSES)
+    train_steps = train_gen.n // BATCH_SIZE
+    val_steps = val_gen.n // BATCH_SIZE
+    class_weights = get_class_weights(DATA_DIR, VALIDATION_SPLIT)
     
-    # Sử dụng categorical_crossentropy vì đầu ra là 2 neurons (REAL, FAKE) với softmax
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy']) 
+    
+    # 2. TẠO VÀ HUẤN LUYỆN MÔ HÌNH (GIAI ĐOẠN WARM-UP)
+    print("\n[PHASE 1] Bắt đầu Huấn luyện Warm-up (Các lớp nền bị đóng băng)...")
+    
+    model = create_two_stream_model(
+        face_input_shape=(FACE_IMG_WIDTH, FACE_IMG_HEIGHT, 3),
+        context_input_shape=(CONTEXT_IMG_WIDTH, CONTEXT_IMG_HEIGHT, 3)
+    )
 
-    # 3. Định nghĩa Callbacks
-    checkpoint = ModelCheckpoint(
-        os.path.join(OUTPUT_DIR, MODEL_FILE),
-        monitor='val_loss',
-        save_best_only=True,
-        verbose=1
-    )
-    early_stop = EarlyStopping(monitor='val_loss', patience=5)
-    
-    # 4. Huấn luyện
-    history = model.fit(
-        train_gen,
-        validation_data=val_gen,
-        epochs=EPOCHS,
-        callbacks=[checkpoint, early_stop],
-        class_weight=class_weights,
-        verbose=1
+    warmup_callbacks = [
+        EarlyStopping(monitor='val_loss', patience=7, restore_best_weights=True),
+        ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=1e-6, verbose=1),
+    ]
+
+    model.fit(
+        train_gen, steps_per_epoch=train_steps, epochs=EPOCHS_WARMUP,
+        validation_data=val_gen, validation_steps=val_steps,
+        class_weight=class_weights, callbacks=warmup_callbacks
     )
     
-    # 5. Lưu lịch sử huấn luyện
-    pd.DataFrame(history.history).to_csv(os.path.join(OUTPUT_DIR, HISTORY_FILE), index=False)
-    print(f"Huấn luyện hoàn tất. Mô hình tốt nhất được lưu tại {os.path.join(OUTPUT_DIR, MODEL_FILE)}")
+    # 3. TINH CHỈNH (FINE-TUNING)
+    print("\n[PHASE 2] Bắt đầu Tinh chỉnh (Mở khóa các lớp cuối)...")
+
+    model = fine_tune_two_stream_model(model) 
+
+    finetune_callbacks = [
+        EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True),
+        ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=1e-7, verbose=1),
+        ModelCheckpoint(os.path.join(MODEL_OUTPUT_DIR, MODEL_NAME), monitor='val_loss', save_best_only=True)
+    ]
+    
+    model.fit(
+        train_gen, steps_per_epoch=train_steps, epochs=EPOCHS_FINETUNE,
+        validation_data=val_gen, validation_steps=val_steps,
+        class_weight=class_weights, callbacks=finetune_callbacks
+    )
+
+    # 4. LƯU MÔ HÌNH CUỐI CÙNG
+    final_model_path = os.path.join(MODEL_OUTPUT_DIR, f'final_{MODEL_NAME}')
+    model.save(final_model_path)
+    print(f"\n--- Hoàn thành huấn luyện. Mô hình cuối cùng được lưu tại: {final_model_path} ---")
+
 
 if __name__ == '__main__':
+    if not os.path.exists(MODEL_OUTPUT_DIR):
+        os.makedirs(MODEL_OUTPUT_DIR)
+        
     train_model()
