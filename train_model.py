@@ -13,10 +13,10 @@ from config import *
 from model_arch import create_two_stream_model, fine_tune_two_stream_model
 
 
-# --- HÀM TẠO DATA GENERATOR CHO MÔ HÌNH HAI NHÁNH ---
+# --- HÀM TẠO DATA GENERATOR CHO MÔ HÌNH HAI NHÁNH (ĐÃ SỬA LỖI) ---
 def get_two_stream_generator(data_dir, target_size_face, target_size_context, batch_size, subset, validation_split):
     datagen = ImageDataGenerator(
-        rescale=1./255, # Chuẩn hóa
+        rescale=1./255, 
         rotation_range=10, width_shift_range=0.1, height_shift_range=0.1, 
         shear_range=0.1, zoom_range=0.1, horizontal_flip=True,
         validation_split=validation_split
@@ -34,14 +34,15 @@ def get_two_stream_generator(data_dir, target_size_face, target_size_context, ba
         class_mode='categorical', subset=subset, seed=42
     )
     
-    # 3. Lấy tổng số mẫu (.n) từ generator của Keras (Sửa lỗi Attribute)
+    # 3. Lấy tổng số mẫu (.n) từ generator của Keras (Khắc phục lỗi Attribute)
     total_samples = face_gen.n 
     
     # 4. Định nghĩa Generator tùy chỉnh để gộp input
     def two_stream_generator():
         while True:
-            X_face = face_gen.next()
-            X_context = context_gen.next()
+            # SỬA LỖI: Sử dụng .__next__() thay cho .next()
+            X_face = face_gen.__next__() 
+            X_context = context_gen.__next__()
             
             # Trả về dictionary cho hai đầu vào của mô hình và nhãn
             yield ({'face_input': X_face[0], 'context_input': X_context[0]}, X_face[1])
@@ -72,24 +73,18 @@ def get_class_weights(data_dir, validation_split):
     print(f"Trọng số lớp được tính: {class_weights}")
     return class_weights
 
-# --- HÀM LOSS FUNCTION TÙY CHỈNH CÓ TRỌNG SỐ (Sửa lỗi ValueError) ---
+# --- HÀM LOSS FUNCTION TÙY CHỈNH CÓ TRỌNG SỐ (Khắc phục lỗi class_weight) ---
 def weighted_categorical_crossentropy(class_weights):
-    # Chuyển dictionary trọng số thành tensor
     weights = tf.constant(list(class_weights.values()), dtype=tf.float32)
     def loss(y_true, y_pred):
         y_true = tf.cast(y_true, tf.float32)
         y_pred = tf.cast(y_pred, tf.float32)
         
-        # 1. Tính categorical crossentropy cơ bản
         cce = tf.keras.losses.categorical_crossentropy(y_true, y_pred)
         
-        # 2. Áp dụng trọng số lớp (dựa trên nhãn đúng y_true)
-        # Lấy nhãn của lớp đúng (0 hoặc 1)
         y_true_labels = tf.argmax(y_true, axis=-1)
-        # Lấy trọng số tương ứng
         sample_weights = tf.gather(weights, y_true_labels)
         
-        # 3. Áp dụng trọng số vào loss
         weighted_loss = cce * sample_weights
         return weighted_loss
     return loss
@@ -139,7 +134,6 @@ def train_model():
         model.fit(
             train_gen, steps_per_epoch=train_steps, epochs=EPOCHS_WARMUP,
             validation_data=val_gen, validation_steps=val_steps,
-            # XÓA class_weight KHỎI fit() vì đã tích hợp vào Loss
             callbacks=warmup_callbacks
         )
     else:
@@ -149,7 +143,8 @@ def train_model():
     # 3. TINH CHỈNH (FINE-TUNING)
     print("\n[PHASE 2] Bắt đầu Tinh chỉnh (Mở khóa các lớp cuối)...")
 
-    model = fine_tune_two_stream_model(model, LEARNING_RATE_FINETUNE) # Cập nhật Learning Rate cho Finetune
+    # Đảm bảo fine_tune_two_stream_model nhận learning rate
+    model = fine_tune_two_stream_model(model, LEARNING_RATE_FINETUNE) 
 
     finetune_callbacks = [
         EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True),
@@ -160,7 +155,6 @@ def train_model():
     model.fit(
         train_gen, steps_per_epoch=train_steps, epochs=EPOCHS_FINETUNE,
         validation_data=val_gen, validation_steps=val_steps,
-        # XÓA class_weight KHỎI fit()
         callbacks=finetune_callbacks
     )
 
