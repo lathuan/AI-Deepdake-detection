@@ -13,7 +13,7 @@ from config import *
 from model_arch import create_two_stream_model, fine_tune_two_stream_model
 
 
-# --- HÀM TẠO DATA GENERATOR CHO MÔ HÌNH HAI NHÁNH (ĐÃ SỬA LỖI) ---
+# --- HÀM TẠO DATA GENERATOR CHO MÔ HÌNH HAI NHÁNH ---
 def get_two_stream_generator(data_dir, target_size_face, target_size_context, batch_size, subset, validation_split):
     datagen = ImageDataGenerator(
         rescale=1./255, # Chuẩn hóa
@@ -34,7 +34,7 @@ def get_two_stream_generator(data_dir, target_size_face, target_size_context, ba
         class_mode='categorical', subset=subset, seed=42
     )
     
-    # 3. Lấy tổng số mẫu (.n) từ generator của Keras (rất quan trọng)
+    # 3. Lấy tổng số mẫu (.n) từ generator của Keras (Sửa lỗi Attribute)
     total_samples = face_gen.n 
     
     # 4. Định nghĩa Generator tùy chỉnh để gộp input
@@ -50,7 +50,7 @@ def get_two_stream_generator(data_dir, target_size_face, target_size_context, ba
     return two_stream_generator(), total_samples
 
 
-# --- HÀM TÍNH TRỌNG SỐ LỚP (Giữ nguyên) ---
+# --- HÀM TÍNH TRỌNG SỐ LỚP ---
 def get_class_weights(data_dir, validation_split):
     # Tạo generator cơ sở CHỈ để lấy các nhãn (classes) của tập huấn luyện
     temp_gen_base = ImageDataGenerator(validation_split=validation_split).flow_from_directory(
@@ -72,11 +72,32 @@ def get_class_weights(data_dir, validation_split):
     print(f"Trọng số lớp được tính: {class_weights}")
     return class_weights
 
+# --- HÀM LOSS FUNCTION TÙY CHỈNH CÓ TRỌNG SỐ (Sửa lỗi ValueError) ---
+def weighted_categorical_crossentropy(class_weights):
+    # Chuyển dictionary trọng số thành tensor
+    weights = tf.constant(list(class_weights.values()), dtype=tf.float32)
+    def loss(y_true, y_pred):
+        y_true = tf.cast(y_true, tf.float32)
+        y_pred = tf.cast(y_pred, tf.float32)
+        
+        # 1. Tính categorical crossentropy cơ bản
+        cce = tf.keras.losses.categorical_crossentropy(y_true, y_pred)
+        
+        # 2. Áp dụng trọng số lớp (dựa trên nhãn đúng y_true)
+        # Lấy nhãn của lớp đúng (0 hoặc 1)
+        y_true_labels = tf.argmax(y_true, axis=-1)
+        # Lấy trọng số tương ứng
+        sample_weights = tf.gather(weights, y_true_labels)
+        
+        # 3. Áp dụng trọng số vào loss
+        weighted_loss = cce * sample_weights
+        return weighted_loss
+    return loss
 
-# --- HÀM CHÍNH ĐỂ HUẤN LUYỆN (ĐÃ SỬA LỖI) ---
+
+# --- HÀM CHÍNH ĐỂ HUẤN LUYỆN ---
 def train_model():
     # 1. TẠO DATA GENERATORS VÀ TÍNH TOÁN
-    # Sửa lỗi: Hàm get_two_stream_generator giờ trả về 2 giá trị
     train_gen, train_samples = get_two_stream_generator(
         data_dir=DATA_DIR, target_size_face=(FACE_IMG_WIDTH, FACE_IMG_HEIGHT),
         target_size_context=(CONTEXT_IMG_WIDTH, CONTEXT_IMG_HEIGHT),
@@ -89,7 +110,6 @@ def train_model():
         batch_size=BATCH_SIZE, subset='validation', validation_split=VALIDATION_SPLIT
     )
 
-    # Tính toán steps_per_epoch bằng cách sử dụng số lượng mẫu đã lấy
     train_steps = train_samples // BATCH_SIZE
     val_steps = val_samples // BATCH_SIZE
     class_weights = get_class_weights(DATA_DIR, VALIDATION_SPLIT)
@@ -103,26 +123,33 @@ def train_model():
         context_input_shape=(CONTEXT_IMG_WIDTH, CONTEXT_IMG_HEIGHT, 3)
     )
 
+    # COMPILE VỚI HÀM LOSS CÓ TRỌNG SỐ
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE_WARMUP),
+        loss=weighted_categorical_crossentropy(class_weights),  
+        metrics=['accuracy']
+    )
+
     warmup_callbacks = [
         EarlyStopping(monitor='val_loss', patience=7, restore_best_weights=True),
         ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, min_lr=1e-6, verbose=1),
     ]
 
-    # Kiểm tra nếu train_steps > 0 trước khi fit
     if train_steps > 0:
         model.fit(
             train_gen, steps_per_epoch=train_steps, epochs=EPOCHS_WARMUP,
             validation_data=val_gen, validation_steps=val_steps,
-            class_weight=class_weights, callbacks=warmup_callbacks
+            # XÓA class_weight KHỎI fit() vì đã tích hợp vào Loss
+            callbacks=warmup_callbacks
         )
     else:
         print("LỖI: Số lượng bước huấn luyện (train_steps) bằng 0. Kiểm tra lại dữ liệu và BATCH_SIZE.")
-        return # Dừng nếu không có dữ liệu để train
+        return 
     
     # 3. TINH CHỈNH (FINE-TUNING)
     print("\n[PHASE 2] Bắt đầu Tinh chỉnh (Mở khóa các lớp cuối)...")
 
-    model = fine_tune_two_stream_model(model) 
+    model = fine_tune_two_stream_model(model, LEARNING_RATE_FINETUNE) # Cập nhật Learning Rate cho Finetune
 
     finetune_callbacks = [
         EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True),
@@ -133,7 +160,8 @@ def train_model():
     model.fit(
         train_gen, steps_per_epoch=train_steps, epochs=EPOCHS_FINETUNE,
         validation_data=val_gen, validation_steps=val_steps,
-        class_weight=class_weights, callbacks=finetune_callbacks
+        # XÓA class_weight KHỎI fit()
+        callbacks=finetune_callbacks
     )
 
     # 4. LƯU MÔ HÌNH CUỐI CÙNG
