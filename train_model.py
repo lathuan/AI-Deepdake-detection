@@ -13,7 +13,7 @@ from config import *
 from model_arch import create_two_stream_model, fine_tune_two_stream_model
 
 
-# --- HÀM TẠO DATA GENERATOR CHO MÔ HÌNH HAI NHÁNH (ĐÃ SỬA LỖI) ---
+# --- HÀM TẠO DATA GENERATOR CHO MÔ HÌNH HAI NHÁNH (ĐÃ SỬA LỖI .__next__()) ---
 def get_two_stream_generator(data_dir, target_size_face, target_size_context, batch_size, subset, validation_split):
     datagen = ImageDataGenerator(
         rescale=1./255, 
@@ -143,7 +143,6 @@ def train_model():
     # 3. TINH CHỈNH (FINE-TUNING)
     print("\n[PHASE 2] Bắt đầu Tinh chỉnh (Mở khóa các lớp cuối)...")
 
-    # Đảm bảo fine_tune_two_stream_model nhận learning rate
     model = fine_tune_two_stream_model(model, LEARNING_RATE_FINETUNE) 
 
     finetune_callbacks = [
