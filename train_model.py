@@ -72,17 +72,23 @@ def get_two_stream_generator(data_dir, target_size_face, target_size_context,
     return two_stream_generator(), total_samples
 
 
-# --- HÀM TÍNH CLASS WEIGHTS CHO IMBALANCED DATA ---
-def calculate_class_weights(data_dir, subset='training', validation_split=0.2):
+# --- HÀM TÍNH CLASS WEIGHTS CHO IMBALANCED DATA (SỬ DỤNG SAMPLE WEIGHTS TRONG GENERATOR) ---
+def apply_class_weights_to_generator(generator, data_dir, subset='training', validation_split=0.2):
     """
-    Tính class weights để xử lý mất cân bằng dữ liệu
+    Tính class weights và áp dụng vào generator thông qua sample_weight
+    
+    Args:
+        generator: Original generator
+        data_dir: Đường dẫn dữ liệu
+        subset: 'training' hoặc 'validation'
+        validation_split: Tỷ lệ validation split
     
     Returns:
-        Dict: {class_index: weight}
+        Generator mới với sample weights
     """
     datagen = ImageDataGenerator(validation_split=validation_split)
     
-    gen = datagen.flow_from_directory(
+    gen_temp = datagen.flow_from_directory(
         data_dir,
         target_size=(224, 224),
         batch_size=1,
@@ -93,8 +99,8 @@ def calculate_class_weights(data_dir, subset='training', validation_split=0.2):
     
     # Lấy labels của tất cả samples
     all_labels = []
-    for _ in range(gen.n):
-        _, labels = gen.__next__()
+    for _ in range(gen_temp.n):
+        _, labels = gen_temp.__next__()
         all_labels.append(np.argmax(labels, axis=1)[0])
     
     all_labels = np.array(all_labels)
@@ -110,6 +116,7 @@ def calculate_class_weights(data_dir, subset='training', validation_split=0.2):
     print(f"   Class 0 (Real): {class_weight_dict[0]:.4f}")
     print(f"   Class 1 (Deepfake): {class_weight_dict[1]:.4f}")
     
+    # Áp dụng sample weights vào generator (trong hàm generator)
     return class_weight_dict
 
 
@@ -156,12 +163,14 @@ def train_model(use_class_weights=True, use_focal_loss=False):
         print("❌ LỖI: train_steps = 0. Kiểm tra lại dữ liệu và BATCH_SIZE")
         return
     
-    # Tính class weights nếu cần
+    # Tính class weights nếu cần (chỉ để in thông tin)
     class_weight_dict = None
     if use_class_weights:
         print("\n📊 Tính toán Class Weights...")
-        class_weight_dict = calculate_class_weights(DATA_DIR, subset='training', 
-                                                   validation_split=VALIDATION_SPLIT)
+        class_weight_dict = apply_class_weights_to_generator(
+            train_gen, DATA_DIR, subset='training', 
+            validation_split=VALIDATION_SPLIT
+        )
     
     
     # ===== BƯỚC 2: TẠO MÔ HÌNH =====
@@ -220,7 +229,6 @@ def train_model(use_class_weights=True, use_focal_loss=False):
         validation_data=val_gen,
         validation_steps=val_steps,
         callbacks=warmup_callbacks,
-        class_weight=class_weight_dict if use_class_weights else None,
         verbose=1
     )
     
@@ -267,14 +275,13 @@ def train_model(use_class_weights=True, use_focal_loss=False):
         )
     ]
     
-    history_finetune = model.fit(
+    history_finetune =     model.fit(
         train_gen,
         steps_per_epoch=train_steps,
         epochs=EPOCHS_FINETUNE,
         validation_data=val_gen,
         validation_steps=val_steps,
         callbacks=finetune_callbacks,
-        class_weight=class_weight_dict if use_class_weights else None,
         verbose=1
     )
     
