@@ -3,7 +3,7 @@ LEARNING_RATE_WARMUP = 1e-4  # Tốc độ học tập cho Pha 1: Warm-up
 LEARNING_RATE_FINETUNE = 1e-5  # Tốc độ học tập cho Pha 2: Fine-tuning
 
 # --- CẤU HÌNH DỮ LIỆU ---
-DATA_DIR = 'processed_data'
+DATA_DIR = 'processed_data_small'
 BATCH_SIZE = 16 
 
 # Kích thước đầu vào cho Nhánh Khuôn mặt (Face Stream)
