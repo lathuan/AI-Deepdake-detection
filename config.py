@@ -25,3 +25,9 @@ MODEL_FILE = 'mesonet_binary_detector.h5'
 HISTORY_FILE = 'mesonet_binary_history.csv' 
 OUTPUT_DIR = 'output'
 PROCESSED_DATA_DIR = 'processed_data'
+
+# config.py (simple defaults for local dev)
+OUTPUT_DIR = "models"
+MODEL_FILE = "model.h5"
+IMG_WIDTH = 128
+IMG_HEIGHT = 128

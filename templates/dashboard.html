@@ -1,0 +1,70 @@
+{% extends "layout.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h2 class="text-2xl mb-4">Dashboard — {{ user }}</h2>
+
+<div class="bg-[#0d1117] p-4 rounded mb-6">
+  <h3 class="font-semibold mb-2">Upload video mới</h3>
+  <form id="upload-form" enctype="multipart/form-data">
+    <input type="file" id="video" name="video" accept="video/*" class="mb-2"/>
+    <button class="bg-[#4caf50] text-black px-3 py-1 rounded">Tải lên & Phân tích</button>
+  </form>
+  <p id="status" class="text-gray-300 mt-2"></p>
+</div>
+
+<div class="bg-[#0d1117] p-4 rounded">
+  <h3 class="font-semibold mb-3">Lịch sử phân tích</h3>
+  {% if videos %}
+    <table class="w-full text-left">
+      <thead>
+        <tr class="text-gray-400">
+          <th>#</th><th>File</th><th>Uploaded</th><th>Latest prediction</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in videos %}
+          <tr class="border-t border-gray-800">
+            <td class="py-2">{{ loop.index }}</td>
+            <td>{{ v.filename }}</td>
+            <td>{{ v.uploaded_at }}</td>
+            <td>
+              {% if v.predictions|length > 0 %}
+                {% set p = v.predictions[-1] %}
+                {{ p.label }} ({{ '%.2f'|format(p.confidence) }})
+              {% else %}
+                N/A
+              {% endif %}
+            </td>
+            <td>
+              <a class="text-[#4caf50]" href="{{ url_for('uploaded_file', filename=v.filename) }}" target="_blank">Xem</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="text-gray-400">Bạn chưa upload video nào.</p>
+  {% endif %}
+</div>
+
+<script>
+document.getElementById('upload-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = document.getElementById('video').files[0];
+  const status = document.getElementById('status');
+  if (!f) { status.textContent = 'Chưa chọn file.'; return; }
+  status.textContent = 'Đang tải...';
+  const fd = new FormData();
+  fd.append('video', f);
+  const res = await fetch('/analyze', { method:'POST', body: fd });
+  if (!res.ok) {
+    status.textContent = 'Lỗi: ' + (await res.text());
+    return;
+  }
+  const j = await res.json();
+  status.textContent = `Kết quả: ${j.label} (score: ${j.score}) — Saved`;
+  // reload to show history
+  setTimeout(()=>location.reload(), 800);
+});
+</script>
+{% endblock %}

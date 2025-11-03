@@ -5,19 +5,35 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{% block title %}Deepfake Demo{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <div class="container">
+<body class="bg-gray-900 text-white">
+  <nav class="bg-[#161b22] p-4 shadow">
+    <div class="max-w-6xl mx-auto flex justify-between items-center">
+      <a class="text-xl font-bold text-[#4caf50]" href="{{ url_for('index') }}">AI Deepfake Detector</a>
+      <div>
+        {% if session.get('user_id') %}
+          <a class="mr-4" href="{{ url_for('dashboard') }}">{{ session.get('username') }}</a>
+          <a class="btn" href="{{ url_for('logout') }}">Đăng xuất</a>
+        {% else %}
+          <a class="mr-4" href="{{ url_for('login_page') }}">Đăng nhập</a>
+          <a class="btn" href="{{ url_for('register_page') }}">Đăng ký</a>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-6xl mx-auto p-6">
     {% with messages = get_flashed_messages() %}
       {% if messages %}
-        <div class="flash">
+        <div class="mb-4">
           {% for m in messages %}
-            <div class="flash-item">{{ m }}</div>
+            <div class="bg-red-500 text-white p-2 rounded">{{ m }}</div>
           {% endfor %}
         </div>
       {% endif %}
     {% endwith %}
     {% block content %}{% endblock %}
-  </div>
+  </main>
 </body>
 </html>
