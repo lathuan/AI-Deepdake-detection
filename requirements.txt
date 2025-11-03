@@ -1,0 +1,21 @@
+
+# requirements.txt - CÀI ĐẶT DEPENDENCIES
+
+# Deep Learning
+tensorflow==2.13.0
+tensorflow-gpu==2.13.0  # Nếu bạn dùng GPU (tuỳ chọn)
+
+# Data Processing
+numpy==1.24.3
+scikit-learn==1.3.0
+Pillow==10.0.0
+
+# Visualization
+matplotlib==3.7.2
+seaborn==0.12.2
+
+# Utilities
+opencv-python==4.8.0
+
+# TUỲ CHỌN: Focal Loss (nếu muốn dùng)
+tensorflow-addons==0.21.0
