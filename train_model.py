@@ -6,7 +6,6 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
 from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
-import pandas as pd
 
 # 1. IMPORT CẤU HÌNH VÀ KIẾN TRÚC
 from config import *
@@ -19,35 +18,27 @@ def get_two_stream_generator(data_dir, target_size_face, target_size_context, ba
         rescale=1./255, 
         rotation_range=10, width_shift_range=0.1, height_shift_range=0.1, 
         shear_range=0.1, zoom_range=0.1, horizontal_flip=True,
-        validation_split=validation_split
+        validation_split=VALIDATION_SPLIT 
     )
 
-    # 1. Tạo Generator cho nhánh Khuôn mặt (để lấy số lượng mẫu .n)
     face_gen = datagen.flow_from_directory(
         data_dir, target_size=target_size_face, batch_size=batch_size,
         class_mode='categorical', subset=subset, seed=42
     )
 
-    # 2. Tạo Generator cho nhánh Ngữ cảnh
     context_gen = datagen.flow_from_directory(
         data_dir, target_size=target_size_context, batch_size=batch_size,
         class_mode='categorical', subset=subset, seed=42
     )
     
-    # 3. Lấy tổng số mẫu (.n) từ generator của Keras (Khắc phục lỗi Attribute)
     total_samples = face_gen.n 
     
-    # 4. Định nghĩa Generator tùy chỉnh để gộp input
     def two_stream_generator():
         while True:
-            # SỬA LỖI: Sử dụng .__next__() thay cho .next()
             X_face = face_gen.__next__() 
             X_context = context_gen.__next__()
-            
-            # Trả về dictionary cho hai đầu vào của mô hình và nhãn
             yield ({'face_input': X_face[0], 'context_input': X_context[0]}, X_face[1])
 
-    # 5. Trả về generator VÀ tổng số mẫu
     return two_stream_generator(), total_samples
 
 
@@ -73,7 +64,7 @@ def get_class_weights(data_dir, validation_split):
     print(f"Trọng số lớp được tính: {class_weights}")
     return class_weights
 
-# --- HÀM LOSS FUNCTION TÙY CHỈNH CÓ TRỌNG SỐ (Khắc phục lỗi class_weight) ---
+# --- HÀM LOSS FUNCTION TÙY CHỈNH CÓ TRỌNG SỐ ---
 def weighted_categorical_crossentropy(class_weights):
     weights = tf.constant(list(class_weights.values()), dtype=tf.float32)
     def loss(y_true, y_pred):
@@ -118,7 +109,7 @@ def train_model():
         context_input_shape=(CONTEXT_IMG_WIDTH, CONTEXT_IMG_HEIGHT, 3)
     )
 
-    # COMPILE VỚI HÀM LOSS CÓ TRỌNG SỐ
+    # COMPILE VỚI HÀM LOSS CÓ TRỌNG SỐ TÙY CHỈNH
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE_WARMUP),
         loss=weighted_categorical_crossentropy(class_weights),  
@@ -135,6 +126,7 @@ def train_model():
             train_gen, steps_per_epoch=train_steps, epochs=EPOCHS_WARMUP,
             validation_data=val_gen, validation_steps=val_steps,
             callbacks=warmup_callbacks
+            # KHÔNG TRUYỀN class_weight VÀO fit()
         )
     else:
         print("LỖI: Số lượng bước huấn luyện (train_steps) bằng 0. Kiểm tra lại dữ liệu và BATCH_SIZE.")
@@ -155,6 +147,7 @@ def train_model():
         train_gen, steps_per_epoch=train_steps, epochs=EPOCHS_FINETUNE,
         validation_data=val_gen, validation_steps=val_steps,
         callbacks=finetune_callbacks
+        # KHÔNG TRUYỀN class_weight VÀO fit()
     )
 
     # 4. LƯU MÔ HÌNH CUỐI CÙNG
