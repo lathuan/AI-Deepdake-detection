@@ -1,17 +1,17 @@
-# model_arch.py (FINAL - ĐÃ SỬA LỖI TÌM LỚP NỀN)
+# model_arch.py (FINAL - ĐÃ SỬA LỖI TÌM LỚP NỀN MẠNH MẼ HƠN)
 
 import tensorflow as tf
 from tensorflow.keras.layers import Input, GlobalAveragePooling2D, Dense, Concatenate, BatchNormalization
 from tensorflow.keras.applications import Xception, ResNet50
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
-# ĐÃ XÓA: import gây lỗi ModuleNotFoundError
 
 
 # --- HÀM TẠO MÔ HÌNH TWO-STREAM ---
 def create_two_stream_model(face_input_shape, context_input_shape):
     # 1. Nhánh Khuôn mặt (Face Stream) - Dùng Xception
     face_input = Input(shape=face_input_shape, name='face_input')
+    # Quan trọng: đặt tên
     face_base = Xception(weights='imagenet', include_top=False, input_tensor=face_input, name='xception')
     
     for layer in face_base.layers:
@@ -23,6 +23,7 @@ def create_two_stream_model(face_input_shape, context_input_shape):
     
     # 2. Nhánh Ngữ cảnh (Context Stream) - Dùng ResNet50
     context_input = Input(shape=context_input_shape, name='context_input')
+    # Quan trọng: đặt tên
     context_base = ResNet50(weights='imagenet', include_top=False, input_tensor=context_input, name='resnet50')
     
     for layer in context_base.layers:
@@ -43,36 +44,43 @@ def create_two_stream_model(face_input_shape, context_input_shape):
     return model
 
 
-# --- HÀM TINH CHỈNH (FINE-TUNING) ---
+# --- HÀM TINH CHỈNH (FINE-TUNING) - ĐÃ SỬA LỖI TÌM KIẾM MẠNH MẼ HƠN ---
 def fine_tune_two_stream_model(model, learning_rate_finetune):
     
     xception_base = None
     resnet_base = None
     
-    # 1. Tìm lớp nền bằng Tên (Ưu tiên)
-    try:
-        xception_base = model.get_layer('xception') 
-        resnet_base = model.get_layer('resnet50')
-    except ValueError:
-        pass # Bỏ qua lỗi và tiếp tục tìm kiếm thủ công
+    # CHIẾN LƯỢC MỚI: Dò tìm qua tất cả các lớp của mô hình tổng thể
+    # và kiểm tra loại của từng lớp
+    for layer in model.layers:
+        if isinstance(layer, Xception) and layer.name == 'xception':
+             xception_base = layer
+        elif isinstance(layer, ResNet50) and layer.name == 'resnet50':
+             resnet_base = layer
+             
+    # CƠ CHẾ DỰ PHÒNG 2: Nếu chưa tìm thấy, cố gắng tìm bằng tên (như lần trước)
+    if xception_base is None:
+        try:
+            xception_base = model.get_layer('xception')
+        except ValueError:
+            pass
+    if resnet_base is None:
+        try:
+            resnet_base = model.get_layer('resnet50')
+        except ValueError:
+            pass
 
-    # CƠ CHẾ DỰ PHÒNG: Tìm kiếm thủ công qua tất cả các lớp
-    if xception_base is None or resnet_base is None:
-        print("CẢNH BÁO: Tên lớp nền không được tìm thấy. Thử tìm kiếm thủ công...")
-        
-        for layer in model.layers:
-            if layer.name == 'xception':
-                xception_base = layer
-            elif layer.name == 'resnet50':
-                resnet_base = layer
     
     # Báo lỗi nếu vẫn không tìm thấy và trả về mô hình cũ
     if xception_base is None or resnet_base is None:
          print("LỖI: KHÔNG THỂ TINH CHỈNH. Thất bại khi tìm lớp nền Xception/ResNet50.")
+         
+         # ĐỂ TRÁNH LỖI TypeError: Mean.update_state, chúng ta compile lại
+         # với Loss và Metrics TƯỜNG MINH.
          model.compile(
             optimizer=Adam(learning_rate=learning_rate_finetune),
-            loss=model.loss,
-            metrics=model.metrics
+            loss='categorical_crossentropy', # Gán Loss Tường minh
+            metrics=['accuracy'] # Gán Metrics Tường minh
          )
          return model
 
@@ -90,11 +98,11 @@ def fine_tune_two_stream_model(model, learning_rate_finetune):
 
     print(f"--- ĐÃ MỞ KHÓA 50 lớp cuối của Xception và ResNet50. ---")
 
-    # 3. Biên dịch lại (Recompile) với Tốc độ học tập mới
+    # 3. Biên dịch lại (Recompile) với Tốc độ học tập mới và Loss Tường minh
     model.compile(
         optimizer=Adam(learning_rate=learning_rate_finetune),
-        loss=model.loss, 
-        metrics=model.metrics
+        loss='categorical_crossentropy', 
+        metrics=['accuracy']
     )
     
     return model
