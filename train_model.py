@@ -1,18 +1,19 @@
-# train_model.py
+# train_model.py (FINAL - LOẠI BỎ CLASS_WEIGHT VÀ HÀM LOSS TÙY CHỈNH)
 
 import os
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
-from sklearn.utils.class_weight import compute_class_weight
+# BỎ: from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
+from tensorflow.keras.losses import CategoricalCrossentropy
 
 # 1. IMPORT CẤU HÌNH VÀ KIẾN TRÚC
 from config import *
 from model_arch import create_two_stream_model, fine_tune_two_stream_model
 
 
-# --- HÀM TẠO DATA GENERATOR CHO MÔ HÌNH HAI NHÁNH (ĐÃ SỬA LỖI .__next__()) ---
+# --- HÀM TẠO DATA GENERATOR CHO MÔ HÌNH HAI NHÁNH ---
 def get_two_stream_generator(data_dir, target_size_face, target_size_context, batch_size, subset, validation_split):
     datagen = ImageDataGenerator(
         rescale=1./255, 
@@ -42,46 +43,7 @@ def get_two_stream_generator(data_dir, target_size_face, target_size_context, ba
     return two_stream_generator(), total_samples
 
 
-# --- HÀM TÍNH TRỌNG SỐ LỚP ---
-def get_class_weights(data_dir, validation_split):
-    # Tạo generator cơ sở CHỈ để lấy các nhãn (classes) của tập huấn luyện
-    temp_gen_base = ImageDataGenerator(validation_split=validation_split).flow_from_directory(
-        data_dir, 
-        target_size=(FACE_IMG_WIDTH, FACE_IMG_HEIGHT), 
-        batch_size=1, 
-        subset='training', 
-        class_mode='categorical', 
-        shuffle=False 
-    )
-    
-    classes_labels = temp_gen_base.classes
-    unique_classes = np.unique(classes_labels)
-    
-    weights = compute_class_weight('balanced', classes=unique_classes, y=classes_labels)
-    class_weights = dict(zip(unique_classes, weights))
-    
-    print(f"Indices: {temp_gen_base.class_indices}")
-    print(f"Trọng số lớp được tính: {class_weights}")
-    return class_weights
-
-# --- HÀM LOSS FUNCTION TÙY CHỈNH CÓ TRỌNG SỐ ---
-def weighted_categorical_crossentropy(class_weights):
-    weights = tf.constant(list(class_weights.values()), dtype=tf.float32)
-    def loss(y_true, y_pred):
-        y_true = tf.cast(y_true, tf.float32)
-        y_pred = tf.cast(y_pred, tf.float32)
-        
-        cce = tf.keras.losses.categorical_crossentropy(y_true, y_pred)
-        
-        y_true_labels = tf.argmax(y_true, axis=-1)
-        sample_weights = tf.gather(weights, y_true_labels)
-        
-        weighted_loss = cce * sample_weights
-        return weighted_loss
-    return loss
-
-
-# --- HÀM CHÍNH ĐỂ HUẤN LUYỆN ---
+# --- HÀM CHÍNH ĐỂ HUẤN LUYỆN (ĐÃ LOẠI BỎ class_weights) ---
 def train_model():
     # 1. TẠO DATA GENERATORS VÀ TÍNH TOÁN
     train_gen, train_samples = get_two_stream_generator(
@@ -98,8 +60,13 @@ def train_model():
 
     train_steps = train_samples // BATCH_SIZE
     val_steps = val_samples // BATCH_SIZE
-    class_weights = get_class_weights(DATA_DIR, VALIDATION_SPLIT)
     
+    # BỎ CÁC DÒNG TÍNH TOÁN TRỌNG SỐ LỚP
+    
+    # In ra thông tin cơ bản (thay thế cho output tính trọng số lớp cũ)
+    print(f"Found {train_samples} images belonging to 2 classes. (Training)")
+    print(f"Found {val_samples} images belonging to 2 classes. (Validation)")
+
     
     # 2. TẠO VÀ HUẤN LUYỆN MÔ HÌNH (GIAI ĐOẠN WARM-UP)
     print("\n[PHASE 1] Bắt đầu Huấn luyện Warm-up (Các lớp nền bị đóng băng)...")
@@ -109,10 +76,10 @@ def train_model():
         context_input_shape=(CONTEXT_IMG_WIDTH, CONTEXT_IMG_HEIGHT, 3)
     )
 
-    # COMPILE VỚI HÀM LOSS CÓ TRỌNG SỐ TÙY CHỈNH
+    # COMPILE VỚI HÀM LOSS CHUẨN
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE_WARMUP),
-        loss=weighted_categorical_crossentropy(class_weights),  
+        loss=CategoricalCrossentropy(), # Dùng Loss chuẩn
         metrics=['accuracy']
     )
 

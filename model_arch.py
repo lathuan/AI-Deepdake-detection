@@ -1,20 +1,19 @@
-# model_arch.py
+# model_arch.py (FINAL - ĐÃ SỬA LỖI TÌM LỚP NỀN)
 
 import tensorflow as tf
 from tensorflow.keras.layers import Input, GlobalAveragePooling2D, Dense, Concatenate, BatchNormalization
 from tensorflow.keras.applications import Xception, ResNet50
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.src.engine.functional import Functional as FunctionalModel # Giữ để tương thích
+# ĐÃ XÓA: import gây lỗi ModuleNotFoundError
+
 
 # --- HÀM TẠO MÔ HÌNH TWO-STREAM ---
 def create_two_stream_model(face_input_shape, context_input_shape):
     # 1. Nhánh Khuôn mặt (Face Stream) - Dùng Xception
     face_input = Input(shape=face_input_shape, name='face_input')
-    # base model: Xception (QUAN TRỌNG: Đặt tên cho base model là 'xception')
     face_base = Xception(weights='imagenet', include_top=False, input_tensor=face_input, name='xception')
     
-    # Đóng băng tất cả các lớp của Xception
     for layer in face_base.layers:
         layer.trainable = False
         
@@ -24,10 +23,8 @@ def create_two_stream_model(face_input_shape, context_input_shape):
     
     # 2. Nhánh Ngữ cảnh (Context Stream) - Dùng ResNet50
     context_input = Input(shape=context_input_shape, name='context_input')
-    # base model: ResNet50 (QUAN TRỌNG: Đặt tên cho base model là 'resnet50')
     context_base = ResNet50(weights='imagenet', include_top=False, input_tensor=context_input, name='resnet50')
     
-    # Đóng băng tất cả các lớp của ResNet50
     for layer in context_base.layers:
         layer.trainable = False
         
@@ -39,7 +36,7 @@ def create_two_stream_model(face_input_shape, context_input_shape):
     combined = Concatenate()([face_output, context_output])
     combined = BatchNormalization()(combined)
     combined = Dense(64, activation='relu')(combined)
-    output = Dense(2, activation='softmax')(combined) # 2 lớp: fake/real
+    output = Dense(2, activation='softmax')(combined) 
     
     model = Model(inputs=[face_input, context_input], outputs=output)
     
@@ -49,20 +46,35 @@ def create_two_stream_model(face_input_shape, context_input_shape):
 # --- HÀM TINH CHỈNH (FINE-TUNING) ---
 def fine_tune_two_stream_model(model, learning_rate_finetune):
     
-    # 1. Tìm lớp nền bằng Tên đã đặt, sử dụng try-except để bắt lỗi một cách "mềm"
+    xception_base = None
+    resnet_base = None
+    
+    # 1. Tìm lớp nền bằng Tên (Ưu tiên)
     try:
-        # Lấy base model bằng tên đã đặt
         xception_base = model.get_layer('xception') 
         resnet_base = model.get_layer('resnet50')
     except ValueError:
-        print("LỖI: KHÔNG THỂ TINH CHỈNH. Tên lớp nền ('xception'/'resnet50') không được tìm thấy.")
-        # Nếu thất bại, chỉ recompile mô hình và trả về để chạy tiếp
-        model.compile(
+        pass # Bỏ qua lỗi và tiếp tục tìm kiếm thủ công
+
+    # CƠ CHẾ DỰ PHÒNG: Tìm kiếm thủ công qua tất cả các lớp
+    if xception_base is None or resnet_base is None:
+        print("CẢNH BÁO: Tên lớp nền không được tìm thấy. Thử tìm kiếm thủ công...")
+        
+        for layer in model.layers:
+            if layer.name == 'xception':
+                xception_base = layer
+            elif layer.name == 'resnet50':
+                resnet_base = layer
+    
+    # Báo lỗi nếu vẫn không tìm thấy và trả về mô hình cũ
+    if xception_base is None or resnet_base is None:
+         print("LỖI: KHÔNG THỂ TINH CHỈNH. Thất bại khi tìm lớp nền Xception/ResNet50.")
+         model.compile(
             optimizer=Adam(learning_rate=learning_rate_finetune),
             loss=model.loss,
             metrics=model.metrics
-        )
-        return model 
+         )
+         return model
 
     # 2. Bắt đầu Mở khóa (Unfreeze)
     
@@ -81,7 +93,7 @@ def fine_tune_two_stream_model(model, learning_rate_finetune):
     # 3. Biên dịch lại (Recompile) với Tốc độ học tập mới
     model.compile(
         optimizer=Adam(learning_rate=learning_rate_finetune),
-        loss=model.loss, # SỬ DỤNG LẠI LOSS VÀ METRICS TỪ PHASE 1
+        loss=model.loss, 
         metrics=model.metrics
     )
     
