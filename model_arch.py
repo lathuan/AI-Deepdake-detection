@@ -7,7 +7,8 @@ from tensorflow.keras.applications import Xception, ResNet50
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.metrics import Precision, Recall, AUC
-
+import os
+import shutil
 
 # --- HÀM TẠO MÔ HÌNH TWO-STREAM (CẢI THIỆN) ---
 def create_two_stream_model(face_input_shape, context_input_shape, dropout_stream=0.4, 
@@ -150,7 +151,7 @@ def fine_tune_two_stream_model(model, learning_rate_finetune,
     xception_base = None
     resnet_base = None
     
-    # CÓ CHỂ 1: Tìm bằng isinstance + name
+    # CƠ CHỂ 1: Tìm bằng isinstance + name
     for layer in model.layers:
         if isinstance(layer, Xception) and layer.name == 'xception':
             xception_base = layer
@@ -203,17 +204,29 @@ def print_model_summary(model, verbose=False):
     """
     In thông tin chi tiết về mô hình
     """
+    import os
+    import shutil
+
+    # Lấy kích thước terminal hiện tại
+    terminal_width = shutil.get_terminal_size().columns
+
+    # Nếu terminal quá nhỏ, điều chỉnh độ rộng
+    if terminal_width < 120:
+        print(f"⚠️  Terminal quá nhỏ ({terminal_width} cột), điều chỉnh độ rộng...")
+        os.environ['COLUMNS'] = '120'  # Chỉnh console rộng hơn
+
     print("\n" + "="*80)
     print("📊 THÔNG TIN MÔ HÌNH")
     print("="*80)
-    
+
+    # In summary trên terminal với độ rộng mới
     model.summary()
-    
+
     if verbose:
         print("\n📋 CHI TIẾT CÁC LỚP:")
         for i, layer in enumerate(model.layers):
             trainable = "🔓" if layer.trainable else "🔒"
             params = layer.count_params()
             print(f"  {i:2d}. {trainable} {layer.name:30s} | {layer.__class__.__name__:20s} | {params:>12,} params")
-    
+
     print("="*80 + "\n")

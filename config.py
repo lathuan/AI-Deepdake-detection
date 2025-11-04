@@ -1,4 +1,4 @@
-# config.py - PHIÊN BẢN CẢI THIỆN
+# config.py 
 
 # --- LEARNING RATE CẤU HÌNH ---
 LEARNING_RATE_WARMUP = 1e-4    # Tốc độ học tập cho Pha 1: Warm-up
