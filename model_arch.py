@@ -1,12 +1,13 @@
-# model_arch.py - PHIÊN BẢN CẢI THIỆN (THÊM DROPOUT & LỚPMỚI)
+# model_arch.py - PHIÊN BẢN CẢI THIỆN (THÊM DROPOUT & LỚPMỚI - SỬA LỖI isinstance)
 
 import tensorflow as tf
-from tensorflow.keras.layers import (Input, GlobalAveragePooling2D, Dense, 
-                                     Concatenate, BatchNormalization, Dropout)
+from tensorflow.keras.layers import Input, GlobalAveragePooling2D, Dense, Concatenate, BatchNormalization, Dropout
 from tensorflow.keras.applications import Xception, ResNet50
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.metrics import Precision, Recall, AUC
+import os
+import shutil
 
 
 # --- HÀM TẠO MÔ HÌNH TWO-STREAM (CẢI THIỆN) ---
@@ -131,11 +132,11 @@ def compile_model(model, learning_rate, use_focal_loss=False):
     return model
 
 
-# --- HÀM TINH CHỈNH (FINE-TUNING) - CẢI THIỆN =====
+# --- HÀM TINH CHỈNH (FINE-TUNING) - SỬA BẰNG PATTERN MATCHING =====
 def fine_tune_two_stream_model(model, learning_rate_finetune, 
                               unfreeze_xception=50, unfreeze_resnet=50):
     """
-    Fine-tune mô hình bằng cách mở khóa lớp cuối
+    Fine-tune mô hình bằng cách mở khóa lớp cuối dựa trên pattern
     
     Args:
         model: Trained model
@@ -147,50 +148,56 @@ def fine_tune_two_stream_model(model, learning_rate_finetune,
         Model sau khi fine-tune
     """
     
-    xception_base = None
-    resnet_base = None
+    print("\n🔓 BẮT ĐẦU FINE-TUNING...")
     
-    # CÓ CHỂ 1: Tìm bằng isinstance + name
+    # Phân loại layers theo pattern
+    # ResNet50: layers bắt đầu với conv2, conv3, conv4, conv5
+    # Xception: layers bắt đầu với block1, block2, ..., block14
+    
+    resnet_layers = []
+    xception_layers = []
+    other_layers = []
+    
     for layer in model.layers:
-        if isinstance(layer, Xception) and layer.name == 'xception':
-            xception_base = layer
-        elif isinstance(layer, ResNet50) and layer.name == 'resnet50':
-            resnet_base = layer
+        layer_name = layer.name.lower()
+        # ResNet50 pattern
+        if any(pattern in layer_name for pattern in ['conv2_', 'conv3_', 'conv4_', 'conv5_']):
+            resnet_layers.append(layer)
+        # Xception pattern
+        elif any(pattern in layer_name for pattern in ['block1_', 'block2_', 'block3_', 'block4_', 
+                                                        'block5_', 'block6_', 'block7_', 'block8_', 
+                                                        'block9_', 'block10_', 'block11_', 'block12_', 
+                                                        'block13_', 'block14_']):
+            xception_layers.append(layer)
+        else:
+            other_layers.append(layer)
     
-    # CƠ CHẾ 2: Tìm bằng get_layer (nếu cơ chế 1 thất bại)
-    if xception_base is None:
-        try:
-            xception_base = model.get_layer('xception')
-        except ValueError:
-            pass
-    
-    if resnet_base is None:
-        try:
-            resnet_base = model.get_layer('resnet50')
-        except ValueError:
-            pass
-    
-    # LỖI: Không tìm thấy base models
-    if xception_base is None or resnet_base is None:
-        print("❌ LỖI: KHÔNG THỂ TINH CHỈNH. Thất bại khi tìm lớp nền Xception/ResNet50.")
-        print("⚠ Sẽ dùng mô hình hiện tại mà không fine-tune")
-        
-        # Compile lại với loss & metrics tường minh
-        model = compile_model(model, learning_rate_finetune)
-        return model
+    print(f"\n📊 Phân loại layers:")
+    print(f"   ResNet50 layers: {len(resnet_layers)}")
+    print(f"   Xception layers: {len(xception_layers)}")
+    print(f"   Other layers: {len(other_layers)}")
     
     # MỞ KHÓA CÁC LỚP CUỐI
-    print(f"🔓 Mở khóa {unfreeze_xception} lớp cuối của Xception...")
-    for layer in xception_base.layers[-unfreeze_xception:]:
+    count_xception = 0
+    count_resnet = 0
+    
+    # Mở khóa Xception
+    print(f"\n🔓 Mở khóa {unfreeze_xception} lớp cuối của Xception...")
+    for layer in xception_layers[-unfreeze_xception:]:
         if not isinstance(layer, BatchNormalization):
             layer.trainable = True
+            count_xception += 1
+    print(f"   ✓ Đã mở khóa {count_xception}/{len(xception_layers)} lớp Xception")
     
+    # Mở khóa ResNet50
     print(f"🔓 Mở khóa {unfreeze_resnet} lớp cuối của ResNet50...")
-    for layer in resnet_base.layers[-unfreeze_resnet:]:
+    for layer in resnet_layers[-unfreeze_resnet:]:
         if not isinstance(layer, BatchNormalization):
             layer.trainable = True
+            count_resnet += 1
+    print(f"   ✓ Đã mở khóa {count_resnet}/{len(resnet_layers)} lớp ResNet50")
     
-    print(f"✓ Đã mở khóa {unfreeze_xception + unfreeze_resnet} lớp nền")
+    print(f"\n✓ Tổng cộng đã mở khóa {count_xception + count_resnet} lớp nền\n")
     
     # COMPILE LẠI VỚI LEARNING RATE MỚI
     model = compile_model(model, learning_rate_finetune, use_focal_loss=False)
@@ -203,17 +210,29 @@ def print_model_summary(model, verbose=False):
     """
     In thông tin chi tiết về mô hình
     """
+    import os
+    import shutil
+
+    # Lấy kích thước terminal hiện tại
+    terminal_width = shutil.get_terminal_size().columns
+
+    # Nếu terminal quá nhỏ, điều chỉnh độ rộng
+    if terminal_width < 120:
+        print(f"⚠️  Terminal quá nhỏ ({terminal_width} cột), điều chỉnh độ rộng...")
+        os.environ['COLUMNS'] = '120'  # Chỉnh console rộng hơn
+
     print("\n" + "="*80)
     print("📊 THÔNG TIN MÔ HÌNH")
     print("="*80)
-    
+
+    # In summary trên terminal với độ rộng mới
     model.summary()
-    
+
     if verbose:
         print("\n📋 CHI TIẾT CÁC LỚP:")
         for i, layer in enumerate(model.layers):
             trainable = "🔓" if layer.trainable else "🔒"
             params = layer.count_params()
             print(f"  {i:2d}. {trainable} {layer.name:30s} | {layer.__class__.__name__:20s} | {params:>12,} params")
-    
+
     print("="*80 + "\n")

@@ -1,4 +1,4 @@
-# config.py 
+# config.py - PHIÊN BẢN CẢI THIỆN
 
 # --- LEARNING RATE CẤU HÌNH ---
 LEARNING_RATE_WARMUP = 1e-4    # Tốc độ học tập cho Pha 1: Warm-up
@@ -36,8 +36,8 @@ DENSE_UNITS_3 = 32          # Dense layer 3 (combined) - THÊMMỚI
 
 # --- CẤU HÌNH ĐẦURATO ---
 MODEL_OUTPUT_DIR = 'models'
-MODEL_NAME = 'two_stream_deepfake_model.h5'
-FINAL_MODEL_NAME = 'final_two_stream_deepfake_model.h5'
+MODEL_NAME = 'two_stream_deepfake_model.keras'  # SỬA: .h5 → .keras
+FINAL_MODEL_NAME = 'final_two_stream_deepfake_model.keras'  # SỬA: .h5 → .keras
 
 # --- CẤU HÌNH FINE-TUNING ---
 UNFREEZE_LAYERS_XCEPTION = 50   # Số lớp cuối của Xception để mở khóa
