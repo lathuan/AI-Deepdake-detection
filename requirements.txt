@@ -5,3 +5,12 @@ numpy
 tensorflow
 gunicorn
 psycopg2-binary
+torch>=1.9.0
+torchvision>=0.10.0
+opencv-python>=4.5.0
+ultralytics>=8.0.0
+numpy>=1.21.0
+matplotlib>=3.5.0
+Pillow>=8.0.0
+scikit-learn>=1.0.0
+tqdm>=4.60.0
