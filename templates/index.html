@@ -1,45 +1,31 @@
-{% extends "layout.html" %}
-{% block title %}AI Deepfake Detector{% endblock %}
-{% block content %}
-<section class="text-center">
-  <h1 class="text-4xl font-bold mb-4">Phát hiện <span class="text-[#4caf50]">Deepfake</span></h1>
-  <p class="text-gray-400 mb-6">Tải video lên, hệ thống sẽ kiểm tra và trả về kết quả.</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Deepfake Detection</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
 
-  {% if session.get('user_id') %}
-    <div class="mx-auto max-w-2xl bg-[#0d1117] p-6 rounded">
-      <form id="upload-form" enctype="multipart/form-data">
-        <input type="file" name="video" id="video" accept="video/*" class="mb-4 w-full"/>
-        <button type="submit" class="bg-[#4caf50] text-black px-4 py-2 rounded">Tải lên & Phân tích</button>
-      </form>
-      <p id="status" class="mt-4 text-gray-300"></p>
-    </div>
-  {% else %}
-    <div class="bg-[#0d1117] p-6 rounded inline-block">
-      <p>Bạn cần <a class="text-[#4caf50]" href="{{ url_for('login_page') }}">đăng nhập</a> để tải video và phân tích.</p>
-    </div>
-  {% endif %}
-</section>
+    <nav class="navbar">
+        <div class="nav-left">
+            <a class="nav-logo" href="/">DeepfakeDetect</a>
+        </div>
+        <div class="nav-right">
+            <a href="/login">Login</a>
+            <a href="/register" class="btn-primary">Register</a>
+        </div>
+    </nav>
 
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  const form = document.getElementById('upload-form');
-  if (!form) return;
-  const status = document.getElementById('status');
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const f = document.getElementById('video').files[0];
-    if (!f) { status.textContent = 'Chưa chọn file.'; return; }
-    status.textContent = 'Đang tải lên...';
-    const fd = new FormData();
-    fd.append('video', f);
-    const res = await fetch('/analyze', { method: 'POST', body: fd });
-    if (!res.ok) {
-      status.textContent = 'Lỗi: ' + (await res.text());
-      return;
-    }
-    const j = await res.json();
-    status.textContent = `Kết quả: ${j.label} (score: ${j.score}) — Video đã lưu: ${j.video_url}`;
-  });
-});
-</script>
-{% endblock %}
+    <main class="container">
+        <div class="hero">
+            <h1>AI Deepfake Detection</h1>
+            <p>Upload your video and detect whether it is real or fake with our AI model.</p>
+
+            <a href="/login" class="btn-primary">Login to start</a>
+        </div>
+    </main>
+
+</body>
+</html>
