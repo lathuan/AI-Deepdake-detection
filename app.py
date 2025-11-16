@@ -7,25 +7,17 @@ from predict import predict_deepfake
 
 app = Flask(__name__)
 
-# --- Thư mục upload ---
 UPLOAD_FOLDER = "examples/test_videos"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# ================================
-#  KẾT NỐI POSTGRESQL
-# ================================
 DATABASE_URL = os.environ.get("DATABASE_URL")
-
 if not DATABASE_URL:
     raise ValueError("❌ DATABASE_URL chưa được thiết lập trong Render Environment Variables")
 
 conn = psycopg2.connect(DATABASE_URL, sslmode="require")
 
-
-# ================================
-#  TẠO BẢNG NẾU CHƯA CÓ
-# ================================
+# Tạo bảng nếu chưa có
 def init_db():
     with conn.cursor() as cur:
         cur.execute("""
@@ -39,25 +31,16 @@ def init_db():
         """)
         conn.commit()
 
-
-# ================================
-#  TRANG CHÍNH
-# ================================
 @app.route("/")
 def index():
     return render_template("index.html")
 
-
-# ================================
-#  UPLOAD + PREDICT
-# ================================
 @app.route("/upload", methods=["POST"])
 def upload_video():
     if "video" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
 
     video_file = request.files["video"]
-
     if video_file.filename == "":
         return jsonify({"error": "Empty filename"}), 400
 
@@ -67,13 +50,13 @@ def upload_video():
     # Gọi model AI
     result = predict_deepfake(save_path)
 
-    # Xóa file
+    # Xóa file sau khi xử lý
     try:
         os.remove(save_path)
     except:
         pass
 
-    # Lưu DB
+    # Lưu vào DB
     with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO results (filename, prediction, probability)
@@ -87,10 +70,6 @@ def upload_video():
 
     return jsonify(result)
 
-
-# ================================
-#  XEM KẾT QUẢ
-# ================================
 @app.route("/results")
 def get_results():
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -98,10 +77,9 @@ def get_results():
         rows = cur.fetchall()
     return jsonify(rows)
 
-
-# ================================
-#  RUN FLASK (DEV)
-# ================================
 if __name__ == "__main__":
     init_db()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
+
+
