@@ -177,6 +177,44 @@ def predict_deepfake(video_path):
             )
             conn.commit()
     except Exception as e:
-        print(f"❌ Lỗi lưu DB: {e}")
+        print(f"❌ Lỗi khi load model: {e}")
+        return
+    
+    # Khởi tạo face detector và video processor
+    face_detector = FaceDetector(model_path='yolov8l-face-lindevs.pt')
+    video_processor = VideoProcessor(face_detector)
+    
+    # Dự đoán
+    result = video_processor.predict_video(args.video, model, device)
+    
+    # Hiển thị kết quả
+    display_result(args.video, result)
 
-    return result
+# Thêm vào cuối predict.py (trước if __name__ == "__main__")
+
+def predict_deepfake(video_path, model_path='model/best_deepfake_model_dfd.pth', device='auto'):
+    """
+    Hàm dự đoán deepfake cho Flask app
+    """
+    try:
+        # Kiểm tra file video
+        if not os.path.exists(video_path):
+            return {"error": "Video file not found"}
+        
+        # Load model
+        model, device = load_trained_model(model_path, device)
+        
+        # Khởi tạo face detector và video processor
+        face_detector = FaceDetector(model_path='yolov8l-face-lindevs.pt')
+        video_processor = VideoProcessor(face_detector)
+        
+        # Dự đoán
+        result = video_processor.predict_video(video_path, model, device)
+        
+        return result
+        
+    except Exception as e:
+        return {"error": f"Prediction error: {str(e)}"}
+
+if __name__ == "__main__":
+    main()
