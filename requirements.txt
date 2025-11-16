@@ -7,3 +7,4 @@ numpy
 matplotlib
 pillow
 ultralytics  # cho YOLO face detection
+psycopg2-binary
