@@ -96,3 +96,32 @@ def predict_deepfake(video_path, model_path='model/best_deepfake_model_dfd.pth',
 
 if __name__ == "__main__":
     main()
+import os
+from utils.model_loader import load_trained_model
+from utils.face_detector import FaceDetector
+from utils.video_processor import VideoProcessor
+import cv2
+import base64
+
+def encode_face_to_base64(face):
+    _, buffer = cv2.imencode('.jpg', face)
+    return base64.b64encode(buffer.tobytes()).decode('utf-8')
+
+def predict_deepfake(video_path, model_path='model/best_deepfake_model_dfd.pth', device='auto'):
+    try:
+        if not os.path.exists(video_path):
+            return {"error": "Video file not found"}
+
+        model, device = load_trained_model(model_path, device)
+        face_detector = FaceDetector(model_path='yolov8l-face-lindevs.pt')
+        video_processor = VideoProcessor(face_detector)
+
+        result = video_processor.predict_video(video_path, model, device)
+
+        # Encode faces sample sang base64
+        if 'faces_sample' in result and len(result['faces_sample']) > 0:
+            result['faces_sample'] = [encode_face_to_base64(face) for face in result['faces_sample']]
+
+        return result
+    except Exception as e:
+        return {"error": f"Prediction error: {str(e)}"}

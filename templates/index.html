@@ -1,73 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Deepfake Detection</title>
-    <link rel="stylesheet" href="/static/style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cyber AI Deepfake Scanner</title>
+<link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+<nav class="navbar">
+    <div class="nav-logo">CYBER AI DETECT</div>
+</nav>
 
-    <nav class="navbar">
-        <div class="nav-left">
-            <a class="nav-logo" href="/">DeepfakeDetect</a>
-        </div>
-    </nav>
+<main class="container">
+    <h1>⚡ AI Deepfake Scanner</h1>
+    <p>Upload a video and detect if it is real or fake using next-gen AI technology.</p>
 
-    <main class="container">
-        <div class="hero">
-            <h1>AI Deepfake Detection</h1>
-            <p>Upload your video and detect whether it is real or fake with our AI model.</p>
+    <div class="upload-area">
+        <input type="file" id="videoInput">
+        <button id="detectBtn">💻 Scan Video</button>
+    </div>
 
-            <!-- Input video + button detect -->
-            <input type="file" id="video-input" accept="video/*">
-            <button id="detect-btn" class="btn-primary">Detect Deepfake</button>
+    <div id="result" class="result"></div>
+</main>
 
-            <!-- Kết quả -->
-            <div id="result" style="margin-top:20px;"></div>
-        </div>
-    </main>
+<script>
+document.getElementById('detectBtn').onclick = async () => {
+    const fileInput = document.getElementById('videoInput')
+    if (!fileInput.files.length) return alert("Chọn video đã nhé!")
 
-    <script>
-        const detectBtn = document.getElementById('detect-btn');
-        const videoInput = document.getElementById('video-input');
-        const resultDiv = document.getElementById('result');
+    const formData = new FormData()
+    formData.append('video', fileInput.files[0])
 
-        detectBtn.addEventListener('click', async () => {
-            if (!videoInput.files.length) {
-                alert("Please select a video first!");
-                return;
-            }
+    const resultDiv = document.getElementById('result')
+    resultDiv.innerHTML = `<div class="loader"></div><p>🔄 Processing video...</p>`
 
-            const formData = new FormData();
-            formData.append('video', videoInput.files[0]);
+    try {
+        const res = await fetch('/upload', {method:'POST', body: formData})
+        const data = await res.json()
+        if(data.error){
+            resultDiv.innerHTML = `<p class="error">❌ Error: ${data.error}</p>`
+            return
+        }
 
-            resultDiv.innerHTML = "<p>Processing video, please wait...</p>";
+        let html = `<h2 class="prediction">${data.prediction}</h2>
+                    <p>Confidence: ${(data.confidence*100).toFixed(2)}%</p>
+                    <p>Faces detected: ${data.num_faces}</p>`
 
-            try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    // Hiển thị kết quả chi tiết
-                    resultDiv.innerHTML = `
-                        <h3>Detection Result:</h3>
-                        <p><strong>Prediction:</strong> ${data.prediction}</p>
-                        <p><strong>Probability:</strong> ${data.probability}</p>
-                    `;
-                } else {
-                    resultDiv.innerHTML = `<p style="color:red;">Error: ${data.error}</p>`;
-                }
-            } catch (err) {
-                resultDiv.innerHTML = `<p style="color:red;">Error uploading video!</p>`;
-                console.error(err);
-            }
-        });
-    </script>
-
+        if(data.faces_sample && data.faces_sample.length>0){
+            html += '<h3>👤 Sample faces:</h3>'
+            data.faces_sample.forEach(face=>{
+                html+=`<img src="data:image/jpeg;base64,${face}" class="face-sample">`
+            })
+        }
+        resultDiv.innerHTML = html
+    } catch(err){
+        resultDiv.innerHTML = `<p class="error">❌ Error during processing!</p>`
+    }
+}
+</script>
 </body>
 </html>
