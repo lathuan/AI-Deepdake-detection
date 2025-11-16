@@ -1,11 +1,10 @@
 # predict.py
 import os
-# predict.py
-import os
 import argparse
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+import psycopg2
 from datetime import datetime
 from utils.model_loader import load_trained_model
 from utils.face_detector import FaceDetector
