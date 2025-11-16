@@ -1,20 +1,31 @@
 # app.py
 from flask import Flask, render_template, request, jsonify
 import os
-from predict import predict_deepfake
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from predict import predict_deepfake
 
 app = Flask(__name__)
-UPLOAD_FOLDER = "examples/test_videos"
+
+# Thư mục upload
+UPLOAD_FOLDER = "examples_test_videos"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# Kết nối PostgreSQL
-DB_URL = os.environ.get("DATABASE_URL")
-conn = psycopg2.connect(DB_URL, sslmode="require")
+# ==========================
+#  KẾT NỐI POSTGRESQL
+# ==========================
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# Khởi tạo bảng nếu chưa có
+if not DATABASE_URL:
+    raise ValueError("❌ DATABASE_URL chưa được đặt trong Render → Environment Variables")
+
+conn = psycopg2.connect(DATABASE_URL, sslmode="require")
+
+
+# ==========================
+#  TẠO BẢNG NẾU CHƯA CÓ
+# ==========================
 def init_db():
     with conn.cursor() as cur:
         cur.execute("""
@@ -28,27 +39,55 @@ def init_db():
         """)
         conn.commit()
 
+
+# ==========================
+#  TRANG CHÍNH
+# ==========================
 @app.route("/")
 def index():
     return render_template("index.html")
 
+
+# ==========================
+#  UPLOAD + PREDICT
+# ==========================
 @app.route("/upload", methods=["POST"])
 def upload_video():
     if "video" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
 
     video_file = request.files["video"]
+
     if video_file.filename == "":
         return jsonify({"error": "Empty filename"}), 400
 
     save_path = os.path.join(app.config["UPLOAD_FOLDER"], video_file.filename)
     video_file.save(save_path)
 
+    # Gọi model AI
     result = predict_deepfake(save_path)
+
+    # Xóa file sau khi xử lý
     os.remove(save_path)
+
+    # Lưu vào database
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO results (filename, prediction, probability)
+            VALUES (%s, %s, %s);
+        """, (
+            video_file.filename,
+            result.get("prediction"),
+            result.get("probability")
+        ))
+        conn.commit()
 
     return jsonify(result)
 
+
+# ==========================
+#  API LẤY KẾT QUẢ
+# ==========================
 @app.route("/results")
 def get_results():
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -56,6 +95,10 @@ def get_results():
         rows = cur.fetchall()
     return jsonify(rows)
 
+
+# ==========================
+#  RUN FLASK
+# ==========================
 if __name__ == "__main__":
     init_db()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
