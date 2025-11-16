@@ -12,10 +12,8 @@
         <div class="nav-left">
             <a class="nav-logo" href="/">DeepfakeDetect</a>
         </div>
-        <div class="nav-right">
-            <a href="/login">Login</a>
-            <a href="/register" class="btn-primary">Register</a>
-        </div>
+        <!-- Không còn login / register -->
+        <div class="nav-right"></div>
     </nav>
 
     <main class="container">
@@ -23,9 +21,48 @@
             <h1>AI Deepfake Detection</h1>
             <p>Upload your video and detect whether it is real or fake with our AI model.</p>
 
-            <a href="/login" class="btn-primary">Login to start</a>
+            <!-- Nút đi thẳng đến upload -->
+            <a href="#upload-section" class="btn-primary">Start Now</a>
         </div>
+
+        <!-- Section upload -->
+        <section id="upload-section" class="upload-box">
+            <h2>Upload Video</h2>
+
+            <form id="uploadForm" enctype="multipart/form-data">
+                <input type="file" name="video" accept="video/*" required>
+                <button type="submit" class="btn-primary">Detect Deepfake</button>
+            </form>
+
+            <div id="result"></div>
+        </section>
     </main>
+
+    <script>
+        const form = document.getElementById("uploadForm");
+        const resultDiv = document.getElementById("result");
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(form);
+
+            resultDiv.innerHTML = "🔄 Processing video...";
+
+            const res = await fetch("/upload", {
+                method: "POST",
+                body: formData
+            });
+
+            const data = await res.json();
+
+            resultDiv.innerHTML = `
+                <h3>Result:</h3>
+                <p>Prediction: <b>${data.prediction}</b></p>
+                <p>Probability: <b>${(data.probability * 100).toFixed(2)}%</b></p>
+            `;
+        });
+    </script>
 
 </body>
 </html>

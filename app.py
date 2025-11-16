@@ -1,72 +1,107 @@
-from flask import Flask, render_template, request, redirect, session, jsonify
-import hashlib
+# app.py
+from flask import Flask, render_template, request, jsonify
+import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from predict import predict_deepfake
 
-app.secret_key = "your_secret_key"
+app = Flask(__name__)
 
-# ==========================
-#  TẠO BẢNG USERS
-# ==========================
-def init_user_table():
+# --- Thư mục upload ---
+UPLOAD_FOLDER = "examples/test_videos"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
+# ================================
+#  KẾT NỐI POSTGRESQL
+# ================================
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if not DATABASE_URL:
+    raise ValueError("❌ DATABASE_URL chưa được thiết lập trong Render Environment Variables")
+
+conn = psycopg2.connect(DATABASE_URL, sslmode="require")
+
+
+# ================================
+#  TẠO BẢNG NẾU CHƯA CÓ
+# ================================
+def init_db():
     with conn.cursor() as cur:
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS users (
+            CREATE TABLE IF NOT EXISTS results (
                 id SERIAL PRIMARY KEY,
-                name TEXT,
-                email TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL
+                filename TEXT,
+                prediction TEXT,
+                probability FLOAT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
         conn.commit()
 
-# ==========================
-#  LOGIN PAGE
-# ==========================
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "GET":
-        return render_template("login.html")
 
-    email = request.form["email"]
-    password = hashlib.sha256(request.form["password"].encode()).hexdigest()
+# ================================
+#  TRANG CHÍNH
+# ================================
+@app.route("/")
+def index():
+    return render_template("index.html")
 
-    with conn.cursor() as cur:
-        cur.execute("SELECT * FROM users WHERE email=%s AND password=%s", (email, password))
-        user = cur.fetchone()
 
-    if user:
-        session["user"] = email
-        return redirect("/")
+# ================================
+#  UPLOAD + PREDICT
+# ================================
+@app.route("/upload", methods=["POST"])
+def upload_video():
+    if "video" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
 
-    return "Sai email hoặc mật khẩu!"
+    video_file = request.files["video"]
 
-# ==========================
-#  REGISTER PAGE
-# ==========================
-@app.route("/register", methods=["GET", "POST"])
-def register():
-    if request.method == "GET":
-        return render_template("register.html")
+    if video_file.filename == "":
+        return jsonify({"error": "Empty filename"}), 400
 
-    name = request.form["name"]
-    email = request.form["email"]
-    password = hashlib.sha256(request.form["password"].encode()).hexdigest()
+    save_path = os.path.join(app.config["UPLOAD_FOLDER"], video_file.filename)
+    video_file.save(save_path)
 
+    # Gọi model AI
+    result = predict_deepfake(save_path)
+
+    # Xóa file
     try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO users (name, email, password)
-                VALUES (%s, %s, %s)
-            """, (name, email, password))
-            conn.commit()
-        return redirect("/login")
+        os.remove(save_path)
+    except:
+        pass
 
-    except psycopg2.Error:
-        return "Email đã tồn tại!"
+    # Lưu DB
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO results (filename, prediction, probability)
+            VALUES (%s, %s, %s)
+        """, (
+            video_file.filename,
+            result.get("prediction"),
+            result.get("probability")
+        ))
+        conn.commit()
 
-# ==========================
-#  LOGOUT
-# ==========================
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect("/login")
+    return jsonify(result)
+
+
+# ================================
+#  XEM KẾT QUẢ
+# ================================
+@app.route("/results")
+def get_results():
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute("SELECT * FROM results ORDER BY created_at DESC LIMIT 20;")
+        rows = cur.fetchall()
+    return jsonify(rows)
+
+
+# ================================
+#  RUN FLASK (DEV)
+# ================================
+if __name__ == "__main__":
+    init_db()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
