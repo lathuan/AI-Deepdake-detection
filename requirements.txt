@@ -1,10 +1,18 @@
 flask
 gunicorn
-torch
-torchvision
+
+# Torch CPU (bắt buộc cho Render, Railway, Heroku)
+torch==2.3.0+cpu
+torchvision==0.18.0+cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 opencv-python
 numpy
 matplotlib
 pillow
-ultralytics  # cho YOLO face detection
+
+# YOLO
+ultralytics
+
+# PostgreSQL
 psycopg2-binary
