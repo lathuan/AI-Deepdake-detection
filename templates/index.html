@@ -1,62 +1,76 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cyber AI Deepfake Scanner</title>
-<link rel="stylesheet" href="/static/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Deepfake Detection</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<nav class="navbar">
-    <div class="nav-logo">CYBER AI DETECT</div>
-</nav>
+    <nav class="navbar">
+        <div class="nav-left">
+            <a href="/" class="nav-logo">DeepfakeDetect</a>
+        </div>
+    </nav>
 
-<main class="container">
-    <h1>⚡ AI Deepfake Scanner</h1>
-    <p>Upload a video and detect if it is real or fake using next-gen AI technology.</p>
+    <main class="container">
+        <h1>AI Deepfake Detection</h1>
+        <p>Upload video và nhận phân tích chi tiết từ AI</p>
 
-    <div class="upload-area">
-        <input type="file" id="videoInput">
-        <button id="detectBtn">💻 Scan Video</button>
-    </div>
+        <input type="file" id="videoInput" accept="video/*">
+        <button id="uploadBtn">Detect Deepfake</button>
 
-    <div id="result" class="result"></div>
-</main>
+        <div id="result" class="result"></div>
+    </main>
 
-<script>
-document.getElementById('detectBtn').onclick = async () => {
-    const fileInput = document.getElementById('videoInput')
-    if (!fileInput.files.length) return alert("Chọn video đã nhé!")
+    <script>
+        const btn = document.getElementById("uploadBtn");
+        const input = document.getElementById("videoInput");
+        const resultDiv = document.getElementById("result");
 
-    const formData = new FormData()
-    formData.append('video', fileInput.files[0])
+        btn.addEventListener("click", async () => {
+            if (!input.files[0]) { alert("Chọn video trước!"); return; }
+            const formData = new FormData();
+            formData.append("video", input.files[0]);
 
-    const resultDiv = document.getElementById('result')
-    resultDiv.innerHTML = `<div class="loader"></div><p>🔄 Processing video...</p>`
+            resultDiv.innerHTML = "<p>🔄 Processing video...</p>";
 
-    try {
-        const res = await fetch('/upload', {method:'POST', body: formData})
-        const data = await res.json()
-        if(data.error){
-            resultDiv.innerHTML = `<p class="error">❌ Error: ${data.error}</p>`
-            return
-        }
+            const resp = await fetch("/upload", { method: "POST", body: formData });
+            const data = await resp.json();
 
-        let html = `<h2 class="prediction">${data.prediction}</h2>
-                    <p>Confidence: ${(data.confidence*100).toFixed(2)}%</p>
-                    <p>Faces detected: ${data.num_faces}</p>`
+            if (data.error) {
+                resultDiv.innerHTML = `<p>❌ ${data.error}</p>`;
+                return;
+            }
 
-        if(data.faces_sample && data.faces_sample.length>0){
-            html += '<h3>👤 Sample faces:</h3>'
-            data.faces_sample.forEach(face=>{
-                html+=`<img src="data:image/jpeg;base64,${face}" class="face-sample">`
-            })
-        }
-        resultDiv.innerHTML = html
-    } catch(err){
-        resultDiv.innerHTML = `<p class="error">❌ Error during processing!</p>`
-    }
-}
-</script>
+            let html = `<h2>Prediction: ${data.prediction}</h2>`;
+            html += `<p>Confidence: ${(data.confidence*100).toFixed(1)}%</p>`;
+            html += `<p>Probability FAKE: ${data.probability.toFixed(3)}</p>`;
+            html += `<p>Number of faces detected: ${data.num_faces}</p>`;
+
+            // Hiển thị frame + heatmap
+            if (data.frames_base64.length > 0) {
+                html += "<h3>Frames Nghi Ngờ:</h3>";
+                data.frames_base64.forEach(frame => {
+                    html += `<div style="display:inline-block; margin:10px; text-align:center;">
+                                <img src="data:image/png;base64,${frame.face_base64}" class="face-img"><br>
+                                Conf: ${(frame.confidence*100).toFixed(1)}%<br>`;
+                    if(frame.heatmap_base64){
+                        html += `<img src="data:image/png;base64,${frame.heatmap_base64}" class="timeline-img">`;
+                    }
+                    html += "</div>";
+                });
+            }
+
+            // Timeline
+            if (data.timeline_base64) {
+                html += "<h3>Confidence Timeline:</h3>";
+                html += `<img src="data:image/png;base64,${data.timeline_base64}" class="timeline-img">`;
+            }
+
+            resultDiv.innerHTML = html;
+        });
+    </script>
 </body>
 </html>
+                                                                 

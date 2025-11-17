@@ -1,16 +1,16 @@
 # predict.py
+import uuid
 import os
 import argparse
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-import psycopg2
 from datetime import datetime
 from utils.model_loader import load_trained_model
 from utils.face_detector import FaceDetector
 from utils.video_processor import VideoProcessor
 
-def create_confidence_timeline(time_confidence_data, overall_prediction):
+def create_confidence_timeline(time_confidence_data,overall_prediction):
     """Tạo biểu đồ confidence theo thời gian"""
     plt.figure(figsize=(12, 4))
     
@@ -30,15 +30,43 @@ def create_confidence_timeline(time_confidence_data, overall_prediction):
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.ylim(0, 1)
-    
-    # Thêm các điểm đánh dấu cho các frame nghi ngờ nhất
-    top_suspicious = sorted(zip(times, confidences), key=lambda x: x[1], reverse=True)[:3]
-    for time, conf in top_suspicious:
-        plt.plot(time, conf, 'ro', markersize=8)
-        plt.annotate(f'{conf:.2f}', (time, conf), xytext=(5, 5), 
-                    textcoords='offset points', fontweight='bold')
-    
     return plt
+
+def predict_deepfake(video_path, model_path='best_deepfake_model_dfd.pth', device='auto'):
+    """Hàm dự đoán để gọi từ Flask"""
+    try:
+        if not os.path.exists(video_path):
+            return {"error": "Video file not found"}
+
+        model, device = load_trained_model(model_path, device)
+        face_detector = FaceDetector()
+        video_processor = VideoProcessor(face_detector)
+
+        result = video_processor.predict_video_detailed(video_path, model, device)
+
+        # Chuẩn bị frame + heatmap cho web
+        frames_for_web = []
+        if "frame_analysis" in result and result["frame_analysis"]:
+            for frame_info in result["frame_analysis"]:
+                face_rgb = frame_info['face_image'][..., ::-1]  # BGR->RGB
+                pil_face = Image.fromarray(face_rgb)
+                pil_heatmap = None
+                if 'heatmap_overlay' in frame_info:
+                    heatmap_rgb = frame_info['heatmap_overlay'][..., ::-1]
+                    pil_heatmap = Image.fromarray(heatmap_rgb)
+
+                frames_for_web.append({
+                    "frame_index": frame_info['frame_index'],
+                    "confidence": frame_info['confidence'],
+                    "is_suspicious": frame_info['is_suspicious'],
+                    "face_image": pil_face,
+                    "heatmap_overlay": pil_heatmap
+                })
+        result['frames_for_web'] = frames_for_web
+        return result
+
+    except Exception as e:
+        return {"error": f"Prediction error: {str(e)}"}
 
 def display_advanced_result(video_path, result):
     """Hiển thị kết quả phân tích nâng cao"""
@@ -159,90 +187,23 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# PostgreSQL connection (Render DATABASE_URL)
-DB_URL = os.environ.get("DATABASE_URL")
-conn = psycopg2.connect(DB_URL, sslmode="require")
-
-def predict_deepfake(video_path):
-    result = process_video_for_api(video_path, model, device)
-
-    # Lưu kết quả vào DB
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO results (filename, prediction, probability) VALUES (%s, %s, %s)",
-                (os.path.basename(video_path), result['prediction'], result['probability'])
-            )
-            conn.commit()
-    except Exception as e:
-        print(f"❌ Lỗi khi load model: {e}")
-        return
-    
-    # Khởi tạo face detector và video processor
-    face_detector = FaceDetector(model_path='yolov8l-face-lindevs.pt')
-    video_processor = VideoProcessor(face_detector)
-    
-    # Dự đoán
-    result = video_processor.predict_video(args.video, model, device)
-    
-    # Hiển thị kết quả
-    display_result(args.video, result)
-
-# Thêm vào cuối predict.py (trước if __name__ == "__main__")
-
-def predict_deepfake(video_path, model_path='model/best_deepfake_model_dfd.pth', device='auto'):
+#rồi đấy bây h sửa code đê :) 
+def predict_deepfake(video_path, model_path='best_deepfake_model_dfd.pth', device='auto'):
     """
-    Hàm dự đoán deepfake cho Flask app
+    Hàm dự đoán để gọi từ Flask
     """
     try:
-        # Kiểm tra file video
         if not os.path.exists(video_path):
             return {"error": "Video file not found"}
-        
+
         # Load model
         model, device = load_trained_model(model_path, device)
-        
-        # Khởi tạo face detector và video processor
-        face_detector = FaceDetector(model_path='yolov8l-face-lindevs.pt')
-        video_processor = VideoProcessor(face_detector)
-        
-        # Dự đoán
-        result = video_processor.predict_video(video_path, model, device)
-        
-        return result
-        
-    except Exception as e:
-        return {"error": f"Prediction error: {str(e)}"}
-
-if __name__ == "__main__":
-    main()
-import os
-from utils.model_loader import load_trained_model
-from utils.face_detector import FaceDetector
-from utils.video_processor import VideoProcessor
-import cv2
-import base64
-
-def encode_face_to_base64(face):
-    _, buffer = cv2.imencode('.jpg', face)
-    return base64.b64encode(buffer.tobytes()).decode('utf-8')
-
-def predict_deepfake(video_path, model_path='model/best_deepfake_model_dfd.pth', device='auto'):
-    try:
-        if not os.path.exists(video_path):
-            return {"error": "Video file not found"}
-
-        model, device = load_trained_model(model_path, device)
-        face_detector = FaceDetector(model_path='yolov8l-face-lindevs.pt')
+        face_detector = FaceDetector()
         video_processor = VideoProcessor(face_detector)
 
-        result = video_processor.predict_video(video_path, model, device)
-
-        # Encode faces sample sang base64
-        if 'faces_sample' in result and len(result['faces_sample']) > 0:
-            result['faces_sample'] = [encode_face_to_base64(face) for face in result['faces_sample']]
-
+        # Dự đoán (dùng phương thức chi tiết)
+        result = video_processor.predict_video_detailed(video_path, model, device)
         return result
+
     except Exception as e:
         return {"error": f"Prediction error: {str(e)}"}
