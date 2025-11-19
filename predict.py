@@ -9,6 +9,8 @@ from datetime import datetime
 from utils.model_loader import load_trained_model
 from utils.face_detector import FaceDetector
 from utils.video_processor import VideoProcessor
+from PIL import Image
+
 
 def create_confidence_timeline(time_confidence_data,overall_prediction):
     """Tạo biểu đồ confidence theo thời gian"""
@@ -203,6 +205,39 @@ def predict_deepfake(video_path, model_path='best_deepfake_model_dfd.pth', devic
 
         # Dự đoán (dùng phương thức chi tiết)
         result = video_processor.predict_video_detailed(video_path, model, device)
+
+        # -------- THÊM LẠI PHẦN frames_for_web BỊ THIẾU --------
+        frames_for_web = []
+        if "frame_analysis" in result and result["frame_analysis"]:
+            for frame_info in result["frame_analysis"]:
+
+                # FACE
+                face_bgr = frame_info.get("face_image")
+                if face_bgr is not None:
+                    # Bảo đảm đúng shape trước khi chuyển
+                    face_rgb = face_bgr[..., ::-1]   # BGR -> RGB
+                    pil_face = Image.fromarray(face_rgb)
+                else:
+                    pil_face = None
+
+                # HEATMAP
+                pil_heatmap = None
+                if "heatmap_overlay" in frame_info and frame_info["heatmap_overlay"] is not None:
+                    heatmap_bgr = frame_info["heatmap_overlay"]
+                    heatmap_rgb = heatmap_bgr[..., ::-1]
+                    pil_heatmap = Image.fromarray(heatmap_rgb)
+
+                frames_for_web.append({
+                    "frame_index": frame_info.get("frame_index"),
+                    "confidence": frame_info.get("confidence"),
+                    "is_suspicious": frame_info.get("is_suspicious"),
+                    "face_image": pil_face,
+                    "heatmap_overlay": pil_heatmap
+                })
+
+        result["frames_for_web"] = frames_for_web
+        # --------------------------------------------------------
+
         return result
 
     except Exception as e:
