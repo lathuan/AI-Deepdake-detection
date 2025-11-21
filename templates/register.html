@@ -6,6 +6,12 @@
     <title>Đăng ký - AI Deepfake Detector</title>
     <!-- Tải Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Thư viện QR Code -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <!-- Thư viện OTPAuth cho TOTP -->
+    <script src="https://cdn.jsdelivr.net/npm/otpauth@1.0.0/dist/otpauth.umd.min.js"></script>
+    <!-- EmailJS -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
         body {
@@ -28,57 +34,30 @@
         .btn-primary:hover {
             background-color: #1b5e20;
         }
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-        }
-        .modal-content {
-            background-color: #161b22;
-            margin: 15% auto;
-            padding: 20px;
-            border: 1px solid #444;
-            width: 80%;
-            max-width: 400px;
-            border-radius: 8px;
-            text-align: center;
-        }
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-        }
-        .close:hover,
-        .close:focus {
-            color: #4caf50;
-            text-decoration: none;
-            cursor: pointer;
+        #qr-canvas {
+            display: block;
+            margin: 0 auto;
+            border: 1px solid #4caf50;
         }
     </style>
 </head>
 <body>
-    <div class="register-card p-8 md:p-10 rounded-xl shadow-2xl w-full max-w-lg border border-gray-700">
-        <h1 class="text-3xl font-bold mb-6 text-center text-[#4caf50]">Đăng ký Tài khoản</h1>
+    <div class="register-card p-8 md:p-10 rounded-xl shadow-2xl w-full max-w-md border border-gray-700">
+        <h1 class="text-3xl font-bold mb-6 text-center text-[#4caf50]">Đăng ký</h1>
         
         <form id="register-form" class="space-y-6">
             <div>
-                <label for="username" class="block text-sm font-medium text-gray-400 mb-1">Tên Người dùng</label>
+                <label for="username" class="block text-sm font-medium text-gray-400 mb-1">Tên người dùng</label>
                 <input 
                     type="text" 
                     id="username" 
                     name="username" 
                     required 
                     class="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 focus:border-[#4caf50] focus:ring focus:ring-[#4caf50] focus:ring-opacity-50 text-white placeholder-gray-500"
-                    placeholder="Nhập tên người dùng"
+                    placeholder="Tên hiển thị"
                 >
             </div>
+            
             <div>
                 <label for="email" class="block text-sm font-medium text-gray-400 mb-1">Địa chỉ Email</label>
                 <input 
@@ -100,19 +79,19 @@
                     required 
                     minlength="6"
                     class="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 focus:border-[#4caf50] focus:ring focus:ring-[#4caf50] focus:ring-opacity-50 text-white placeholder-gray-500"
-                    placeholder="••••••••"
+                    placeholder="Ít nhất 6 ký tự"
                 >
             </div>
-
-             <div>
-                <label for="confirm_password" class="block text-sm font-medium text-gray-400 mb-1">Xác nhận Mật khẩu</label>
+            
+            <div>
+                <label for="confirm-password" class="block text-sm font-medium text-gray-400 mb-1">Xác nhận mật khẩu</label>
                 <input 
                     type="password" 
-                    id="confirm_password" 
+                    id="confirm-password" 
                     name="confirm_password" 
                     required 
                     class="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 focus:border-[#4caf50] focus:ring focus:ring-[#4caf50] focus:ring-opacity-50 text-white placeholder-gray-500"
-                    placeholder="••••••••"
+                    placeholder="Nhập lại mật khẩu"
                 >
             </div>
             
@@ -125,68 +104,143 @@
             Đã có tài khoản? 
             <a href="login.html" class="font-medium text-[#4caf50] hover:text-green-400 transition duration-150">Đăng nhập ngay</a>
         </p>
-    </div>
-
-    <!-- Modal Thành công -->
-    <div id="success-modal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2 class="text-2xl font-bold mb-4 text-[#4caf50]">Đăng ký Thành công!</h2>
-            <p class="text-gray-300 mb-6">Tài khoản của bạn đã được tạo. Bạn sẽ được chuyển đến trang đăng nhập trong giây lát.</p>
-            <button id="modal-ok" class="btn-primary py-2 px-4 rounded-lg">OK</button>
+        
+        <!-- Phần hiển thị QR Code (ẩn ban đầu) -->
+        <div id="qr-section" class="mt-6 space-y-4" style="display: none;">
+            <h2 class="text-xl font-semibold text-center text-[#4caf50]">Xác thực 2 Yếu tố (2FA)</h2>
+            <p class="text-sm text-gray-400 text-center">Quét mã QR dưới đây bằng ứng dụng Google Authenticator hoặc tương tự để thiết lập 2FA. Chúng tôi cũng đã gửi mã QR qua email của bạn.</p>
+            <canvas id="qr-canvas" width="200" height="200"></canvas>
+            <div class="text-center">
+                <button id="continue-btn" class="btn-primary py-2 px-4 rounded-lg text-sm font-semibold" onclick="completeRegistration()">
+                    Hoàn tất Đăng ký
+                </button>
+            </div>
         </div>
     </div>
 
     <script>
-        const form = document.getElementById('register-form');
-        const modal = document.getElementById('success-modal');
-        const closeBtn = document.querySelector('.close');
-        const okBtn = document.getElementById('modal-ok');
+        // Thay thế bằng các giá trị từ EmailJS dashboard của bạn
+        const EMAILJS_PUBLIC_KEY = 'YOUR_PUBLIC_KEY'; // Lấy từ EmailJS
+        const EMAILJS_SERVICE_ID = 'YOUR_SERVICE_ID'; // Service ID
+        const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID'; // Template ID cho email gửi QR
 
-        form.addEventListener('submit', function(e) {
+        // Khởi tạo EmailJS
+        emailjs.init(EMAILJS_PUBLIC_KEY);
+
+        const form = document.getElementById('register-form');
+
+        form.addEventListener('submit', async function(e) {
             e.preventDefault();
             
+            const username = document.getElementById('username').value.trim();
+            const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
-            const confirmPassword = document.getElementById('confirm_password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            
+            if (!username || !email || !password || !confirmPassword) {
+                alert('Vui lòng điền đầy đủ thông tin!');
+                return;
+            }
             
             if (password !== confirmPassword) {
                 alert('Mật khẩu xác nhận không khớp!');
                 return;
             }
             
-            // Giả lập lưu dữ liệu (thực tế sẽ gửi đến server)
-            const userData = {
-                username: document.getElementById('username').value,
-                email: document.getElementById('email').value,
-                password: password
-            };
-            
-            // Lưu vào localStorage (giả lập)
-            localStorage.setItem('userData', JSON.stringify(userData));
-            
-            // Hiển thị modal
-            modal.style.display = 'block';
-            
-            // Tự động chuyển sau 3 giây
-            setTimeout(() => {
-                window.location.href = 'login.html';
-            }, 3000);
-        });
-
-        closeBtn.addEventListener('click', () => {
-            modal.style.display = 'none';
-        });
-
-        okBtn.addEventListener('click', () => {
-            modal.style.display = 'none';
-            window.location.href = 'login.html';
-        });
-
-        window.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.style.display = 'none';
+            if (password.length < 6) {
+                alert('Mật khẩu phải ít nhất 6 ký tự!');
+                return;
             }
+            
+            // Kiểm tra email đã tồn tại (từ localStorage)
+            const existingUserStr = localStorage.getItem('userData');
+            if (existingUserStr) {
+                const existingUser = JSON.parse(existingUserStr);
+                if (existingUser.email === email) {
+                    alert('Email đã được đăng ký!');
+                    return;
+                }
+            }
+            
+            // Tạo secret key cho TOTP
+            const otpauth = new OTPAuth.TOTP({
+                issuer: 'AI Deepfake Detector',
+                label: `AI Deepfake Detector:${username}`,
+                algorithm: 'SHA1',
+                digits: 6,
+                period: 30
+            });
+            const secret = otpauth.secret; // Secret base32
+            
+            // Tạo otpauth URL cho QR
+            const otpauthUrl = otpauth.toString();
+            
+            // Hiển thị QR Code
+            const qrCanvas = document.getElementById('qr-canvas');
+            QRCode.toCanvas(qrCanvas, otpauthUrl, { width: 200, margin: 1, color: { dark: '#4caf50', light: '#000000' } }, function(error) {
+                if (error) {
+                    console.error(error);
+                    alert('Lỗi tạo QR Code!');
+                }
+            });
+            
+            // Ẩn form, hiện QR section
+            document.getElementById('register-form').style.display = 'none';
+            document.getElementById('qr-section').style.display = 'block';
+            
+            // Gửi email với QR Code attachment
+            try {
+                // Generate QR as base64
+                const qrDataUrl = await new Promise((resolve, reject) => {
+                    const tempCanvas = document.createElement('canvas');
+                    QRCode.toCanvas(tempCanvas, otpauthUrl, { width: 200 }, (error, canvas) => {
+                        if (error) reject(error);
+                        else resolve(canvas.toDataURL('image/png'));
+                    });
+                });
+                
+                const base64Image = qrDataUrl.split(',')[1]; // Remove data:image/png;base64,
+                
+                const templateParams = {
+                    to_email: email,
+                    to_name: username,
+                    qr_attachment: {
+                        name: '2FA_QR_Code.png',
+                        data: base64Image,
+                        type: 'image/png'
+                    }
+                };
+                
+                await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+                console.log('Email gửi thành công!');
+            } catch (error) {
+                console.error('Lỗi gửi email:', error);
+                alert('Đăng ký thành công, nhưng không gửi được email. Vui lòng quét QR trên màn hình.');
+            }
+            
+            // Lưu tạm userData (sẽ hoàn tất sau khi user confirm)
+            window.tempUserData = {
+                username,
+                email,
+                password, // Lưu ý: Hash trong production!
+                twofa_secret: secret
+            };
         });
+
+        function completeRegistration() {
+            if (!window.tempUserData) {
+                alert('Dữ liệu đăng ký không hợp lệ!');
+                return;
+            }
+            
+            // Lưu vào localStorage
+            localStorage.setItem('userData', JSON.stringify(window.tempUserData));
+            
+            alert('Đăng ký thành công! Bây giờ bạn có thể đăng nhập với 2FA.');
+            
+            // Chuyển hướng đến login
+            window.location.href = 'login.html';
+        }
     </script>
 </body>
 </html>

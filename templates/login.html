@@ -6,6 +6,8 @@
     <title>Đăng nhập - AI Deepfake Detector</title>
     <!-- Tải Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Thư viện OTPAuth cho TOTP validation -->
+    <script src="https://cdn.jsdelivr.net/npm/otpauth@1.0.0/dist/otpauth.umd.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
         body {
@@ -47,7 +49,7 @@
                 >
             </div>
             
-            <div>
+            <div id="password-div">
                 <label for="password" class="block text-sm font-medium text-gray-400 mb-1">Mật khẩu</label>
                 <input 
                     type="password" 
@@ -59,7 +61,7 @@
                 >
             </div>
             
-            <div class="flex items-center justify-between">
+            <div id="remember-div" class="flex items-center justify-between">
                 <div class="flex items-center">
                     <input id="remember_me" name="remember_me" type="checkbox" class="h-4 w-4 text-[#4caf50] border-gray-600 rounded focus:ring-[#4caf50] bg-gray-800">
                     <label for="remember_me" class="ml-2 block text-sm text-gray-400">Ghi nhớ tôi</label>
@@ -67,9 +69,29 @@
                 <a href="#" class="text-sm font-medium text-[#4caf50] hover:text-green-400 transition duration-150">Quên mật khẩu?</a>
             </div>
             
-            <button type="submit" class="btn-primary py-3 px-4 rounded-lg w-full text-lg font-semibold shadow-lg hover:shadow-xl transition duration-300">
+            <button id="login-btn" type="button" class="btn-primary py-3 px-4 rounded-lg w-full text-lg font-semibold shadow-lg hover:shadow-xl transition duration-300" onclick="handleLoginStep1()">
                 Đăng nhập
             </button>
+            
+            <!-- Phần xác thực 2 yếu tố -->
+            <div id="twofa-section" class="space-y-4" style="display: none;">
+                <div>
+                    <label for="totp-code" class="block text-sm font-medium text-gray-400 mb-1">Mã xác thực 2FA (6 chữ số từ app)</label>
+                    <input 
+                        type="text" 
+                        id="totp-code" 
+                        name="totp_code" 
+                        required 
+                        maxlength="6" 
+                        class="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 focus:border-[#4caf50] focus:ring focus:ring-[#4caf50] focus:ring-opacity-50 text-white placeholder-gray-500"
+                        placeholder="123456"
+                    >
+                    <p class="text-xs text-gray-500 mt-1">Nhập mã từ Google Authenticator (cập nhật mỗi 30 giây).</p>
+                </div>
+                <button id="verify-btn" type="button" class="btn-primary py-3 px-4 rounded-lg w-full text-lg font-semibold shadow-lg hover:shadow-xl transition duration-300" onclick="handleLoginStep2()">
+                    Xác thực và Đăng nhập
+                </button>
+            </div>
         </form>
         
         <p class="mt-6 text-center text-sm text-gray-400">
@@ -79,16 +101,20 @@
     </div>
 
     <script>
-        const form = document.getElementById('login-form');
+        let currentEmail = '';
+        let currentPassword = '';
+        let userData = null;
 
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
+        function handleLoginStep1() {
+            currentEmail = document.getElementById('email').value.trim();
+            currentPassword = document.getElementById('password').value;
             
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const rememberMe = document.getElementById('remember_me').checked;
+            if (!currentEmail || !currentPassword) {
+                alert('Vui lòng nhập email và mật khẩu!');
+                return;
+            }
             
-            // Lấy dữ liệu người dùng từ localStorage (từ đăng ký)
+            // Lấy dữ liệu người dùng từ localStorage
             const userDataStr = localStorage.getItem('userData');
             
             if (!userDataStr) {
@@ -96,24 +122,78 @@
                 return;
             }
             
-            const userData = JSON.parse(userDataStr);
+            userData = JSON.parse(userDataStr);
             
             // Kiểm tra email và mật khẩu
-            if (userData.email === email && userData.password === password) {
-                // Đăng nhập thành công
-                localStorage.setItem('loggedIn', 'true');
-                localStorage.setItem('userName', userData.username || userData.email.split('@')[0]); // Sử dụng username hoặc phần đầu email
-                localStorage.setItem('userAvatar', `https://placehold.co/32x32/4caf50/white?text=${(userData.username || 'U')[0].toUpperCase()}`);
-                
-                // Nếu remember me, có thể lưu lâu dài, nhưng ở đây dùng localStorage mặc định
-                if (rememberMe) {
-                    // Có thể thêm logic lưu lâu hơn nếu cần, ví dụ sessionStorage hoặc không xóa
-                }
-                
-                // Chuyển hướng đến index.html
-                window.location.href = 'index.html';
+            if (userData.email === currentEmail && userData.password === currentPassword) {
+                // Ẩn phần mật khẩu và nút đăng nhập, hiện phần 2FA
+                document.getElementById('password-div').style.display = 'none';
+                document.getElementById('remember-div').style.display = 'none';
+                document.getElementById('login-btn').style.display = 'none';
+                document.getElementById('twofa-section').style.display = 'block';
+                document.getElementById('totp-code').focus();
             } else {
                 alert('Email hoặc mật khẩu không đúng!');
+                document.getElementById('password').focus();
+            }
+        }
+
+        function handleLoginStep2() {
+            const totpCode = document.getElementById('totp-code').value.trim();
+            
+            if (!totpCode || totpCode.length !== 6) {
+                alert('Vui lòng nhập mã 2FA đúng 6 chữ số!');
+                document.getElementById('totp-code').focus();
+                return;
+            }
+            
+            // Tạo TOTP object từ secret đã lưu
+            const otpauth = new OTPAuth.TOTP({
+                issuer: 'AI Deepfake Detector',
+                label: `AI Deepfake Detector:${userData.username}`,
+                secret: userData.twofa_secret,
+                algorithm: 'SHA1',
+                digits: 6,
+                period: 30
+            });
+            
+            // Validate OTP
+            const delta = 0; // Cho phép lệch thời gian nhỏ (0 giây)
+            const isValid = otpauth.validate({ token: totpCode, window: 1 }); // Window 1 để cho phép lệch 30s
+            
+            if (isValid) {
+                // Đăng nhập thành công
+                const rememberMe = document.getElementById('remember_me').checked;
+                localStorage.setItem('loggedIn', 'true');
+                localStorage.setItem('userName', userData.username || userData.email.split('@')[0]);
+                localStorage.setItem('userAvatar', `https://placehold.co/32x32/4caf50/white?text=${(userData.username || 'U')[0].toUpperCase()}`);
+                
+                if (rememberMe) {
+                    // Logic remember me (localStorage mặc định persistent)
+                }
+                
+                // Chuyển hướng
+                window.location.href = 'index.html';
+            } else {
+                alert('Mã xác thực 2FA không đúng! Kiểm tra thời gian trên thiết bị và thử lại.');
+                // Reset
+                document.getElementById('password-div').style.display = 'block';
+                document.getElementById('remember-div').style.display = 'flex';
+                document.getElementById('login-btn').style.display = 'block';
+                document.getElementById('twofa-section').style.display = 'none';
+                document.getElementById('totp-code').value = '';
+                document.getElementById('password').focus();
+            }
+        }
+
+        // Hỗ trợ Enter
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                if (document.getElementById('twofa-section').style.display === 'block') {
+                    handleLoginStep2();
+                } else {
+                    handleLoginStep1();
+                }
             }
         });
     </script>

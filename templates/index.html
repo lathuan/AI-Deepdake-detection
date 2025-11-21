@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -7,31 +6,8 @@
     <title>AI Deepfake Detector - Phát hiện Deepfake AI</title>
     <!-- Tải Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Cấu hình Tailwind cho font Inter -->
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0d1117; /* Nền tối */
-            color: #ffffff;
-        }
-        .card {
-            background-color: #161b22; /* Thẻ tối hơn */
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
-            transition: transform 0.3s ease;
-        }
-        .card:hover {
-            transform: translateY(-2px);
-        }
-        .btn-primary {
-            background-color: #2e7d32; /* Màu xanh lá cây đậm */
-            color: white;
-            transition: background-color 0.3s;
-        }
-        .btn-primary:hover {
-            background-color: #1b5e20;
-        }
-    </style>
+    <!-- Liên kết file CSS riêng -->
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body class="min-h-screen">
     
@@ -42,6 +18,7 @@
                 AI <span class="text-white">Deepfake Detector</span>
             </h1>
             <nav class="space-x-4 flex items-center" id="nav-auth">
+                
                 <a href="#how-it-works" class="text-gray-300 hover:text-[#4caf50] transition duration-150 hidden sm:inline">Cách hoạt động</a>
                 <a href="#pricing" class="text-gray-300 hover:text-[#4caf50] transition duration-150 hidden sm:inline">Giá</a>
                 <!-- Phần chưa đăng nhập -->
@@ -467,91 +444,3 @@
     </script>
 </body>
 </html>
-=======
-{% extends "layout.html" %}
-{% block title %}Nhận diện khuôn mặt từ video{% endblock %}
-{% block content %}
-  <h1>Nhận diện khuôn mặt từ video</h1>
-
-  <div class="card">
-    <h3>Tài khoản</h3>
-    <input id="username" placeholder="username">
-    <input id="password" placeholder="password" type="password">
-    <button id="register">Đăng ký</button>
-    <button id="login">Đăng nhập</button>
-    <div id="authmsg" class="muted"></div>
-  </div>
-
-  <div class="card">
-    <h3>Chọn tệp video</h3>
-    <input id="fileInput" type="file" accept="video/*">
-    <button id="uploadBtn">Tải lên & Phân tích</button>
-    <p id="status" class="muted"></p>
-  </div>
-
-  <div class="card">
-    <h3>Kết quả:</h3>
-    <p id="result">Chưa có kết quả.</p>
-    <pre id="details" style="white-space:pre-wrap"></pre>
-    <video id="preview" controls style="max-width:100%;display:none"></video>
-  </div>
-
-<script>
-const fileInput = document.getElementById('fileInput');
-const uploadBtn = document.getElementById('uploadBtn');
-const statusEl = document.getElementById('status');
-const preview = document.getElementById('preview');
-const resultEl = document.getElementById('result');
-const detailsEl = document.getElementById('details');
-
-let selectedFile = null;
-fileInput.addEventListener('change', (e) => {
-  selectedFile = e.target.files[0];
-  if (!selectedFile) return;
-  preview.src = URL.createObjectURL(selectedFile);
-  preview.style.display = 'block';
-});
-
-uploadBtn.addEventListener('click', async () => {
-  if (!selectedFile) { alert('Hãy chọn file video trước.'); return; }
-  statusEl.textContent = 'Đang tải lên...';
-  const fd = new FormData();
-  fd.append('video', selectedFile);
-  const res = await fetch('/analyze', { method: 'POST', body: fd });
-  if (!res.ok) {
-    const text = await res.text();
-    statusEl.textContent = 'Lỗi: ' + (res.statusText || text);
-    return;
-  }
-  const data = await res.json();
-  statusEl.textContent = '';
-  resultEl.textContent = data.label || 'No label';
-  detailsEl.textContent = JSON.stringify(data, null, 2);
-  if (data.video_url) {
-    preview.src = data.video_url;
-    preview.style.display = 'block';
-  }
-});
-
-// Auth buttons
-document.getElementById('register').onclick = async () => {
-  const u = document.getElementById('username').value, p = document.getElementById('password').value;
-  const r = await fetch('/register', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({username: u, password: p})
-  });
-  const j = await r.json();
-  document.getElementById('authmsg').textContent = j.msg || JSON.stringify(j);
-};
-document.getElementById('login').onclick = async () => {
-  const u = document.getElementById('username').value, p = document.getElementById('password').value;
-  const r = await fetch('/login', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({username: u, password: p})
-  });
-  const j = await r.json();
-  document.getElementById('authmsg').textContent = j.msg || JSON.stringify(j);
-};
-</script>
-{% endblock %}
->>>>>>> 4dcbb340d6fa2c28e827359c8fce6b5770b09cbd

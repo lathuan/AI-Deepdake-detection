@@ -1,0 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+
+body {
+    font-family: 'Inter', sans-serif !important;
+    background-color: #0d1117 !important; /* Force nền tối, tránh override */
+    color: #ffffff !important;
+}
+
+.card {
+    background-color: #161b22 !important; /* Thẻ tối hơn */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.btn-primary {
+    background-color: #2e7d32 !important; /* Màu xanh lá cây đậm */
+    color: white !important;
+    transition: background-color 0.3s;
+}
+
+.btn-primary:hover {
+    background-color: #1b5e20;
+}
+
+/* Thêm style cho modal (để tránh xung đột với Tailwind) */
+#custom-alert-modal .card {
+    background-color: #161b22 !important;
+    border: 1px solid #30363d !important; /* Border nhẹ cho modal */
+}
+
+#custom-alert-modal {
+    background-color: rgba(0, 0, 0, 0.7) !important; /* Overlay tối */
+}
