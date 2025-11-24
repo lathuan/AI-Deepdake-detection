@@ -7,27 +7,50 @@ import requests
 from werkzeug.security import generate_password_hash, check_password_hash
 from PIL import Image
 from predict import predict_deepfake
+import random
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
-# ===== MATPLOTLIB FIX =====
+# Fix matplotlib
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-# ===========================
-
 
 app = Flask(__name__)
 app.secret_key = "2a2fd639618205a5bbbc40f0b64f64d8b8e61c417ea9e7bde08360a15ad8c9ef"
 
-# Google reCAPTCHA SECRET KEY (KEY BẠN GỬI TRONG ẢNH)
+# reCAPTCHA Secret
 RECAPTCHA_SECRET = "6LfPWBYsAAAAAHU-CUw4F68N6zyksBQYUe7kM2DB"
 
-# SESSION
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"] = False
+# Gmail settings
+EMAIL_ADDRESS = "nghoanglam1395@gmail.com"
+EMAIL_PASSWORD = "yghqackzlcccnmsw"   # APP PASSWORD
 
+
+# ---------------------------------------------------------
+# SEND EMAIL OTP
+# ---------------------------------------------------------
+def send_email(to_email, content):
+    msg = MIMEMultipart()
+    msg["From"] = EMAIL_ADDRESS
+    msg["To"] = to_email
+    msg["Subject"] = "OTP Code"
+
+    msg.attach(MIMEText(content, "plain"))
+
+    server = smtplib.SMTP("smtp.gmail.com", 587)
+    server.starttls()
+    server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+    server.send_message(msg)
+    server.quit()
+
+
+# ---------------------------------------------------------
+# DATABASE
+# ---------------------------------------------------------
 DATABASE = "deepfake_results.db"
 
-# ---------------------- DATABASE ----------------------
 def get_db():
     if "db" not in g:
         g.db = sqlite3.connect(DATABASE)
@@ -39,6 +62,7 @@ def close_db(exception):
     db = g.pop("db", None)
     if db:
         db.close()
+
 
 def init_db():
     db = get_db()
@@ -52,24 +76,33 @@ def init_db():
     """)
     db.commit()
 
+
 if not os.path.exists(DATABASE):
     with app.app_context():
         init_db()
 
-# ---------------------- UPLOAD FOLDER ----------------------
+
+# ---------------------------------------------------------
+# UPLOAD FOLDER
+# ---------------------------------------------------------
 UPLOAD_FOLDER = "examples_test_videos"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# ---------------------- ROUTES ----------------------
+
+# ---------------------------------------------------------
+# ROUTES
+# ---------------------------------------------------------
 @app.route("/")
 def index():
     return render_template("index.html")
 
-# ===================== REGISTER =====================
+
+# ================= REGISTER =================
 @app.route("/register", methods=["GET"])
 def register_page():
     return render_template("register.html")
+
 
 @app.route("/register", methods=["POST"])
 def register_submit():
@@ -94,30 +127,24 @@ def register_submit():
 
     return jsonify({"message": "Register success!"})
 
-# ===================== LOGIN =========================
+
+# ================= LOGIN =================
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
         return render_template("login.html")
 
-    # Get form data
     email = request.form.get("email")
     password = request.form.get("password")
     captcha_response = request.form.get("g-recaptcha-response")
 
-    # ================= CAPTCHA VERIFY ===================
     verify_url = "https://www.google.com/recaptcha/api/siteverify"
-    payload = {
-        "secret": RECAPTCHA_SECRET,
-        "response": captcha_response
-    }
-
+    payload = {"secret": RECAPTCHA_SECRET, "response": captcha_response}
     captcha_verify = requests.post(verify_url, data=payload).json()
 
     if not captcha_verify.get("success"):
-        return "Captcha không hợp lệ! Vui lòng thử lại."
+        return "Captcha không hợp lệ!"
 
-    # ================= CHECK LOGIN ======================
     user = get_db().execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
 
     if not user or not check_password_hash(user["password"], password):
@@ -128,86 +155,91 @@ def login():
 
     return redirect(url_for("index"))
 
-# ===================== LOGOUT =========================
+
+# ================= LOGOUT =================
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("login"))
 
-# ===================== HELPERS =========================
-def pil_to_base64(img):
-    buff = io.BytesIO()
-    img.save(buff, format="PNG")
-    return base64.b64encode(buff.getvalue()).decode()
 
-def fig_to_base64(fig):
-    buff = io.BytesIO()
-    fig.savefig(buff, format="png")
-    buff.seek(0)
-    return base64.b64encode(buff.read()).decode()
+# ==================================================
+#       FORGOT PASSWORD + OTP
+# ==================================================
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    # GET → Chỉ hiện ô email
+    if request.method == "GET":
+        return render_template("forgot_verify.html", show_otp=False, message=None, email=None)
 
-def is_logged_in():
-    return "user_id" in session
+    action = request.form.get("action")
 
-# ===================== UPLOAD + PREDICT =====================
-@app.route("/upload", methods=["POST"])
-def upload_video():
-    if not is_logged_in():
-        return jsonify({"error": "Unauthorized"}), 403
+    # -------------------------------------------------
+    # SEND OTP
+    # -------------------------------------------------
+    if action == "send_otp":
+        email = request.form.get("email")
 
-    if "video" not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
+        if not email:
+            return render_template("forgot_verify.html", show_otp=False, message="Vui lòng nhập email!", email=None)
 
-    video = request.files["video"]
-    if video.filename == "":
-        return jsonify({"error": "Empty filename"}), 400
+        user = get_db().execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        if not user:
+            return render_template("forgot_verify.html", show_otp=False, message="Email không tồn tại!", email=None)
 
-    path = os.path.join(app.config["UPLOAD_FOLDER"], video.filename)
-    video.save(path)
+        otp = str(random.randint(100000, 999999))
+        session["reset_email"] = email
+        session["reset_otp"] = otp
 
-    result = predict_deepfake(path)
-    os.remove(path)
+        send_email(email, f"Your OTP code is: {otp}")
 
-    if "error" in result:
-        return jsonify(result), 400
+        return render_template("forgot_verify.html", show_otp=True, message="Đã gửi OTP!", email=email)
 
-    # FRAME RESULTS
-    frames_b64 = []
-    if "frames_for_web" in result:
-        for f in result["frames_for_web"]:
-            frames_b64.append({
-                "frame_index": f["frame_index"],
-                "confidence": f["confidence"],
-                "is_suspicious": f["is_suspicious"],
-                "face_base64": pil_to_base64(f["face_image"]),
-                "heatmap_base64": pil_to_base64(f["heatmap_overlay"]) if f["heatmap_overlay"] else None
-            })
+    # -------------------------------------------------
+    # VERIFY OTP
+    # -------------------------------------------------
+    if action == "verify_otp":
+        user_otp = request.form.get("otp")
 
-    # TIMELINE GRAPH
-    timeline_b64 = None
-    if result.get("time_confidence_data"):
-        times = [x["time_sec"] for x in result["time_confidence_data"]]
-        confs = [x["confidence"] for x in result["time_confidence_data"]]
+        if user_otp == session.get("reset_otp"):
+            return redirect("/reset-password")
 
-        fig, ax = plt.subplots(figsize=(10, 4))
-        ax.plot(times, confs)
-        ax.axhline(0.5, ls="--")
-        ax.set_xlabel("Time (s)")
-        ax.set_ylabel("Confidence Fake")
-        ax.set_title("Confidence theo thời gian")
+        return render_template("forgot_verify.html",
+                               show_otp=True,
+                               message="OTP không đúng!",
+                               email=session.get("reset_email"))
 
-        timeline_b64 = fig_to_base64(fig)
-        plt.close(fig)
+    return redirect("/forgot-password")
 
-    return jsonify({
-        "prediction": result.get("prediction"),
-        "confidence": result.get("confidence"),
-        "probability": result.get("probability"),
-        "num_faces": result.get("num_faces"),
-        "frames_base64": frames_b64,
-        "timeline_base64": timeline_b64
-    })
 
-# ===================== RUN APP =========================
+# ==================================================
+#          RESET PASSWORD
+# ==================================================
+@app.route("/reset-password", methods=["GET", "POST"])
+def reset_password():
+    if request.method == "GET":
+        return render_template("reset_password.html")
+
+    new_pw = request.form.get("password")
+    email = session.get("reset_email")
+
+    if not email:
+        return "Phiên làm việc hết hạn, vui lòng thử lại!"
+
+    hashed_pw = generate_password_hash(new_pw)
+
+    db = get_db()
+    db.execute("UPDATE users SET password = ? WHERE email = ?", (hashed_pw, email))
+    db.commit()
+
+    session.pop("reset_email", None)
+    session.pop("reset_otp", None)
+
+    return "Đổi mật khẩu thành công! <a href='/login'>Đăng nhập</a>"
+
+
+# ---------------------------------------------------------
+# RUN
+# ---------------------------------------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
