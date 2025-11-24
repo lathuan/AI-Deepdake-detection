@@ -212,6 +212,31 @@ def verify_device():
     resp.set_cookie("device_id", device_hash, max_age=60*60*24*365)
 
     return resp
+@app.route("/resend-otp")
+def resend_otp():
+    user_id = session.get("pending_user")
+    device_hash = session.get("pending_device")
+
+    if not user_id or not device_hash:
+        return redirect(url_for("login"))
+
+    # Lấy email user
+    db = get_db()
+    user = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+
+    if not user:
+        return redirect(url_for("login"))
+
+    # Tạo OTP mới
+    otp = str(random.randint(100000, 999999))
+    session["otp"] = otp
+
+    # Gửi mail
+    send_email(user["email"], f"Mã OTP mới của bạn: {otp}")
+
+    return render_template("verify_device.html",
+                           message="OTP mới đã được gửi lại email!")
+
 
 # ================= LOGOUT =================
 @app.route("/logout")
