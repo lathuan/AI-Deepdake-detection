@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login</title>
     <link rel="stylesheet" href="/static/style.css">
+
+    <!-- GOOGLE reCAPTCHA SCRIPT -->
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 </head>
 <body>
 
@@ -12,8 +15,10 @@
         <div class="nav-left">
             <a class="nav-logo" href="/">DeepfakeDetect</a>
         </div>
+
         <div class="nav-right">
             <a href="/login">Login</a>
+
             <a href="/register" class="btn-primary">Register</a>
         </div>
     </nav>
@@ -23,13 +28,20 @@
             <h2>Login</h2>
 
             <form method="POST" action="/login">
+
                 <label>Email</label>
                 <input type="email" name="email" required>
 
                 <label>Password</label>
                 <input type="password" name="password" required>
 
-                <button type="submit" class="btn-primary">Login</button>
+                <!-- Google reCAPTCHA -->
+                <div class="g-recaptcha"
+                     data-sitekey="6LfPWBYsAAAAADWfym05B1aklwFeW_KLYB2u_54-"></div>
+
+                <button type="submit" class="btn-primary" style="margin-top: 15px;">
+                    Login
+                </button>
             </form>
 
             <p>Don't have an account? <a href="/register">Register</a></p>
