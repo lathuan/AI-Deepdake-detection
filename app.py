@@ -70,8 +70,8 @@ app.config["SESSION_COOKIE_SECURE"] = False
 oauth = OAuth(app)
 oauth.register(
     name="google",
-    client_id="xxx",
-    client_secret="xxx",
+    client_id="680496606730-7l1fqt20cdtv5gkoaldaunj55r40jul2.apps.googleusercontent.com",
+    client_secret="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",
     server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
     userinfo_endpoint='https://openidconnect.googleapis.com/v1/userinfo',
 
