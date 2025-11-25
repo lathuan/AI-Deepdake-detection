@@ -8,17 +8,17 @@
 </head>
 <body>
 
-    <nav class="navbar">
-        <div class="nav-left">
-            <a class="nav-logo" href="/">DeepfakeDetect</a>
-        </div>
+    <div class="nav-right">
+    {% if session.get("user_id") %}
+        <a href="/dashboard">Dashboard</a>
+        <a href="/account">Account</a>
+        <a href="/logout" class="btn-logout">Logout</a>
+    {% else %}
+        <a href="/login">Login</a>
+        <a href="/register" class="btn-primary">Register</a>
+    {% endif %}
+</div>
 
-        <div class="nav-right">
-            <a href="/dashboard">Dashboard</a>
-            <a href="/account">Account</a>
-            <a href="/logout" class="btn-logout">Logout</a>
-        </div>
-    </nav>
 
     <main class="container">
         <h2>Welcome!</h2>

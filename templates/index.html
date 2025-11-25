@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,12 +7,26 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+
+    <!-- NAVBAR -->
     <nav class="navbar">
         <div class="nav-left">
             <a href="/" class="nav-logo">DeepfakeDetect</a>
         </div>
+
+        <div class="nav-right">
+            {% if session.get("user_id") %}
+              
+                <a href="/account">Account</a>
+                <a href="/logout" class="btn-logout">Logout</a>
+            {% else %}
+                <a href="/login">Login</a>
+                <a href="/register" class="btn-primary">Register</a>
+            {% endif %}
+        </div>
     </nav>
 
+    <!-- MAIN CONTENT -->
     <main class="container">
         <h1>AI Deepfake Detection</h1>
         <p>Upload video và nhận phân tích chi tiết từ AI</p>
@@ -30,7 +43,11 @@
         const resultDiv = document.getElementById("result");
 
         btn.addEventListener("click", async () => {
-            if (!input.files[0]) { alert("Chọn video trước!"); return; }
+            if (!input.files[0]) { 
+                alert("Chọn video trước!"); 
+                return; 
+            }
+
             const formData = new FormData();
             formData.append("video", input.files[0]);
 
@@ -45,25 +62,23 @@
             }
 
             let html = `<h2>Prediction: ${data.prediction}</h2>`;
-            html += `<p>Confidence: ${(data.confidence*100).toFixed(1)}%</p>`;
+            html += `<p>Confidence: ${(data.confidence * 100).toFixed(1)}%</p>`;
             html += `<p>Probability FAKE: ${data.probability.toFixed(3)}</p>`;
             html += `<p>Number of faces detected: ${data.num_faces}</p>`;
 
-            // Hiển thị frame + heatmap
             if (data.frames_base64.length > 0) {
                 html += "<h3>Frames Nghi Ngờ:</h3>";
                 data.frames_base64.forEach(frame => {
                     html += `<div style="display:inline-block; margin:10px; text-align:center;">
                                 <img src="data:image/png;base64,${frame.face_base64}" class="face-img"><br>
-                                Conf: ${(frame.confidence*100).toFixed(1)}%<br>`;
-                    if(frame.heatmap_base64){
+                                Conf: ${(frame.confidence * 100).toFixed(1)}%<br>`;
+                    if (frame.heatmap_base64) {
                         html += `<img src="data:image/png;base64,${frame.heatmap_base64}" class="timeline-img">`;
                     }
                     html += "</div>";
                 });
             }
 
-            // Timeline
             if (data.timeline_base64) {
                 html += "<h3>Confidence Timeline:</h3>";
                 html += `<img src="data:image/png;base64,${data.timeline_base64}" class="timeline-img">`;
@@ -72,6 +87,6 @@
             resultDiv.innerHTML = html;
         });
     </script>
+
 </body>
 </html>
-                                                                 

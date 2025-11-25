@@ -191,7 +191,8 @@ def login():
     recaptcha_response = request.form.get("g-recaptcha-response")
 
     if not recaptcha_response:
-        return "Vui lòng xác nhận reCAPTCHA!"
+        flash("Vui lòng xác nhận reCAPTCHA!", "error")
+        return redirect(url_for("login"))
 
     verify_url = "https://www.google.com/recaptcha/api/siteverify"
     data = {
@@ -203,7 +204,8 @@ def login():
     recaptcha_verify = requests.post(verify_url, data=data).json()
 
     if not recaptcha_verify.get("success"):
-        return "reCAPTCHA không hợp lệ!"
+        flash("reCAPTCHA không hợp lệ!", "error")
+        return redirect(url_for("login"))
 
     # === LOGIN SAU KHI PASS CAPTCHA ===
 
@@ -211,33 +213,41 @@ def login():
     password = request.form.get("password")
 
     db = get_db()
-    user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    user = db.execute(
+        "SELECT * FROM users WHERE email = ?", 
+        (email,)
+    ).fetchone()
 
     if not user or not check_password_hash(user["password"], password):
-        return "Sai tài khoản hoặc mật khẩu!"
+        flash("Sai tài khoản hoặc mật khẩu!", "error")
+        return redirect(url_for("login"))
 
-    # Device verification
+    # === KIỂM TRA THIẾT BỊ ===
+
     device_hash = generate_device_hash(request)
     device = db.execute(
         "SELECT * FROM devices WHERE user_id=? AND device_hash=?",
         (user["id"], device_hash)
     ).fetchone()
 
+    # ---- THIẾT BỊ ĐÃ TỒN TẠI → LOGIN NGAY ----
     if device:
         session["user_id"] = user["id"]
         resp = make_response(redirect(url_for("index")))
-        resp.set_cookie("device_id", device_hash)
+        resp.set_cookie("device_id", device_hash, max_age=86400*30)
         return resp
 
+    # ---- THIẾT BỊ MỚI → GỬI OTP ----
     otp = str(random.randint(100000, 999999))
+
     session["pending_user"] = user["id"]
     session["pending_device"] = device_hash
     session["otp"] = otp
     session["last_otp_time"] = time.time()
 
-    send_email(user["email"], f"Mã OTP: {otp}")
-    return render_template("verify_device.html", message="Thiết bị mới! Nhập OTP")
+    send_email(user["email"], f"Mã OTP xác minh thiết bị của bạn là: {otp}")
 
+    return render_template("verify_device.html", message="Thiết bị mới! Vui lòng nhập OTP để xác minh.")
 
 @app.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
@@ -439,6 +449,57 @@ def resend_otp():
     flash("OTP mới đã gửi!", "success")
     return render_template("verify_device.html")
 
+@app.route("/change-password", methods=["GET", "POST"])
+def change_password():
+    if "user_id" not in session:
+        flash("Bạn cần đăng nhập trước!", "error")
+        return redirect("/login")
+
+    if request.method == "GET":
+        return render_template("change_password.html")
+
+    old_pw = request.form.get("old_password")
+    new_pw = request.form.get("new_password")
+    confirm_pw = request.form.get("confirm_password")
+
+    # Lấy dữ liệu user từ DB
+    db = get_db()
+    user = db.execute("SELECT * FROM users WHERE id = ?", (session["user_id"],)).fetchone()
+
+    # Kiểm tra mật khẩu cũ đúng
+    if not check_password_hash(user["password"], old_pw):
+        flash("Mật khẩu cũ không chính xác!", "error")
+        return redirect("/change-password")
+
+    # Kiểm tra mật khẩu mới trùng xác nhận
+    if new_pw != confirm_pw:
+        flash("Xác nhận mật khẩu không khớp!", "error")
+        return redirect("/change-password")
+
+    # *********************
+    # KIỂM TRA MẬT KHẨU MẠNH (chỉ cần 7 ký tự)
+    # *********************
+    import re
+    def is_strong(p):
+        return (
+            len(p) >= 7
+            and re.search(r"[A-Z]", p)
+            and re.search(r"[a-z]", p)
+            and re.search(r"[0-9]", p)
+            and re.search(r"[!@#$%^&*(),.?\":{}|<>]", p)
+        )
+
+    if not is_strong(new_pw):
+        flash("Mật khẩu phải ≥ 7 ký tự và bao gồm: chữ hoa, chữ thường, số, ký tự đặc biệt!", "error")
+        return redirect("/change-password")
+
+    # Lưu mật khẩu mới
+    hashed = generate_password_hash(new_pw)
+    db.execute("UPDATE users SET password = ? WHERE id = ?", (hashed, session["user_id"]))
+    db.commit()
+
+    flash("Đổi mật khẩu thành công!", "success")
+    return redirect("/account")
 
 # =========================================================
 # LOGOUT
