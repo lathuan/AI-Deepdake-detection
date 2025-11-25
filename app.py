@@ -1,4 +1,4 @@
-from flask import Flask, g, render_template, request, jsonify, session, redirect, url_for, make_response
+from flask import Flask, g, render_template, request, jsonify, session, redirect, url_for, make_response, flash
 import sqlite3
 import os
 import io
@@ -32,7 +32,6 @@ RECAPTCHA_SECRET = "6LfPWBYsAAAAAHU-CUw4F68N6zyksBQYUe7kM2DB"
 EMAIL_ADDRESS = "nghoanglam1395@gmail.com"
 EMAIL_PASSWORD = "yghqackzlcccnmsw"   # APP PASSWORD
 
-
 # ---------------------------------------------------------
 # SEND EMAIL FUNCTION
 # ---------------------------------------------------------
@@ -65,7 +64,7 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = False
 
 # ---------------------------------------------------------
-# GOOGLE LOGIN FIX — ĐANG DÙNG BẢN CHUẨN NHẤT
+# GOOGLE LOGIN FIX
 # ---------------------------------------------------------
 oauth = OAuth(app)
 oauth.register(
@@ -74,11 +73,9 @@ oauth.register(
     client_secret="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",
     server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
     userinfo_endpoint='https://openidconnect.googleapis.com/v1/userinfo',
-
-    client_kwargs={
-        "scope": "openid email profile"
-    }
+    client_kwargs={"scope": "openid email profile"}
 )
+
 
 # ---------------------------
 # Database helper
@@ -135,39 +132,52 @@ def is_logged_in():
     return "user_id" in session
 
 
-# ---------------------------
-# Routes
-# ---------------------------
+# =========================================================
+# HOME
+# =========================================================
 @app.route("/")
 def index():
     return render_template("index.html", logged=is_logged_in())
 
-# Register
-@app.route("/register", methods=["GET"])
-def register_page():
-    return render_template("register.html")
 
-@app.route("/register", methods=["POST"])
-def register_submit():
+# =========================================================
+# REGISTER — FIXED: FLASH + VALIDATE + REDIRECT LOGIN
+# =========================================================
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "GET":
+        return render_template("register.html")
+
     name = request.form.get("name")
     email = request.form.get("email")
     password = request.form.get("password")
 
-    if not name or not email or not password:
-        return jsonify({"error": "Missing info"}), 400
+    # Password mạnh
+    import re
+    if len(password) < 8 or not re.search(r"[A-Z]", password) or not re.search(r"[^A-Za-z0-9]", password):
+        flash("Password phải ≥ 8 ký tự, có 1 IN HOA và 1 ký tự đặc biệt!", "error")
+        return redirect("/register")
 
     hashed_pw = generate_password_hash(password)
     db = get_db()
-    try:
-        db.execute("INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
-                   (name, email, hashed_pw))
-        db.commit()
-    except sqlite3.IntegrityError:
-        return jsonify({"error": "Email exists"}), 400
 
-    return jsonify({"message": "Register OK"})
+    exists = db.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
+    if exists:
+        flash("Email đã tồn tại!", "error")
+        return redirect("/register")
 
-# Login
+    db.execute("INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
+               (name, email, hashed_pw))
+    db.commit()
+
+    # Thông báo đăng ký thành công
+    flash("Đăng ký thành công! Vui lòng đăng nhập.", "success")
+    return redirect("/login")
+
+
+# =========================================================
+# LOGIN — FIXED FLASH + SHOW SUCCESS MESSAGE
+# =========================================================
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
@@ -179,7 +189,8 @@ def login():
     db = get_db()
     user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if not user or not check_password_hash(user["password"], password):
-        return "Sai tài khoản hoặc mật khẩu!"
+        flash("Sai tài khoản hoặc mật khẩu!", "error")
+        return redirect("/login")
 
     # Device verification
     device_hash = generate_device_hash(request)
@@ -201,11 +212,13 @@ def login():
     session["last_otp_time"] = time.time()
 
     send_email(user["email"], f"Mã OTP: {otp}")
-    return render_template("verify_device.html", message="Thiết bị mới! Nhập OTP")
+    flash("Thiết bị mới! Nhập OTP để xác minh.", "info")
+    return render_template("verify_device.html")
 
-# ---------------------------
-# GOOGLE LOGIN ROUTES
-# ---------------------------
+
+# =========================================================
+# GOOGLE LOGIN
+# =========================================================
 @app.route("/auth/google")
 def auth_google():
     redirect_uri = url_for("auth_google_callback", _external=True)
@@ -214,8 +227,6 @@ def auth_google():
 @app.route("/auth/google/callback")
 def auth_google_callback():
     token = oauth.google.authorize_access_token()
-
-    # LẤY USERINFO CHUẨN OPENID — FIX LỖI MissingSchema
     resp = oauth.google.get("https://openidconnect.googleapis.com/v1/userinfo")
     userinfo = resp.json()
 
@@ -236,7 +247,6 @@ def auth_google_callback():
         db.commit()
         user = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
 
-    # Device verify
     device_hash = generate_device_hash(request)
     device = db.execute(
         "SELECT * FROM devices WHERE user_id=? AND device_hash=?",
@@ -256,20 +266,25 @@ def auth_google_callback():
     session["last_otp_time"] = time.time()
 
     send_email(email, f"Mã OTP: {otp}")
-    return render_template("verify_device.html", message="Thiết bị mới! Nhập OTP")
+    flash("Thiết bị mới! Nhập OTP", "info")
+    return render_template("verify_device.html")
 
-# Verify device
-# ---------------------------
+
+# =========================================================
+# VERIFY DEVICE
+# =========================================================
 @app.route("/verify-device", methods=["POST"])
 def verify_device():
     user_otp = request.form.get("otp")
     real_otp = session.get("otp")
 
     if not real_otp:
-        return render_template("verify_device.html", message="Hết hạn OTP")
+        flash("OTP đã hết hạn!", "error")
+        return render_template("verify_device.html")
 
     if user_otp != real_otp:
-        return render_template("verify_device.html", message="OTP sai!")
+        flash("OTP sai!", "error")
+        return render_template("verify_device.html")
 
     user_id = session.get("pending_user")
     device_hash = session.get("pending_device")
@@ -289,9 +304,10 @@ def verify_device():
 
     return resp
 
-# ---------------------------
-# Resend OTP
-# ---------------------------
+
+# =========================================================
+# RESEND OTP
+# =========================================================
 @app.route("/resend-otp")
 def resend_otp():
     last = session.get("last_otp_time", 0)
@@ -299,7 +315,8 @@ def resend_otp():
 
     if now - last < 60:
         wait = 60 - int(now - last)
-        return render_template("verify_device.html", message=f"Chờ {wait} giây để gửi lại OTP")
+        flash(f"Chờ {wait} giây để gửi lại OTP!", "error")
+        return render_template("verify_device.html")
 
     otp = str(random.randint(100000, 999999))
     session["otp"] = otp
@@ -309,19 +326,22 @@ def resend_otp():
     user = db.execute("SELECT * FROM users WHERE id=?", (session["pending_user"],)).fetchone()
 
     send_email(user["email"], f"OTP mới: {otp}")
-    return render_template("verify_device.html", message="OTP mới đã gửi!")
+    flash("OTP mới đã gửi!", "success")
+    return render_template("verify_device.html")
 
-# ---------------------------
-# Logout
-# ---------------------------
+
+# =========================================================
+# LOGOUT
+# =========================================================
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("login"))
 
-# ---------------------------
-# Video Upload & Predict
-# ---------------------------
+
+# =========================================================
+# VIDEO UPLOAD
+# =========================================================
 @app.route("/upload", methods=["POST"])
 def upload_video():
     if not is_logged_in():
@@ -339,9 +359,10 @@ def upload_video():
 
     return jsonify(result)
 
-# ---------------------------
-# Run
-# ---------------------------
+
+# =========================================================
+# RUN APP
+# =========================================================
 if __name__ == "__main__":
     init_db()
     os.makedirs("examples_test_videos", exist_ok=True)
