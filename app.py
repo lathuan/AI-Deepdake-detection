@@ -178,19 +178,43 @@ def register():
 # =========================================================
 # LOGIN — FIXED FLASH + SHOW SUCCESS MESSAGE
 # =========================================================
+import requests
+
+RECAPTCHA_SECRET = "6LfPWBYsAAAAAHU-CUw4F68N6zyksBQYUe7kM2DB"  # SECRET KEY đúng
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
         return render_template("login.html")
+
+    # === KIỂM TRA reCAPTCHA ===
+    recaptcha_response = request.form.get("g-recaptcha-response")
+
+    if not recaptcha_response:
+        return "Vui lòng xác nhận reCAPTCHA!"
+
+    verify_url = "https://www.google.com/recaptcha/api/siteverify"
+    data = {
+        "secret": RECAPTCHA_SECRET,
+        "response": recaptcha_response,
+        "remoteip": request.remote_addr
+    }
+
+    recaptcha_verify = requests.post(verify_url, data=data).json()
+
+    if not recaptcha_verify.get("success"):
+        return "reCAPTCHA không hợp lệ!"
+
+    # === LOGIN SAU KHI PASS CAPTCHA ===
 
     email = request.form.get("email")
     password = request.form.get("password")
 
     db = get_db()
     user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+
     if not user or not check_password_hash(user["password"], password):
-        flash("Sai tài khoản hoặc mật khẩu!", "error")
-        return redirect("/login")
+        return "Sai tài khoản hoặc mật khẩu!"
 
     # Device verification
     device_hash = generate_device_hash(request)
@@ -212,9 +236,95 @@ def login():
     session["last_otp_time"] = time.time()
 
     send_email(user["email"], f"Mã OTP: {otp}")
-    flash("Thiết bị mới! Nhập OTP để xác minh.", "info")
-    return render_template("verify_device.html")
+    return render_template("verify_device.html", message="Thiết bị mới! Nhập OTP")
 
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "GET":
+        return render_template("forgot_password.html")
+
+    email = request.form.get("email")
+    db = get_db()
+    user = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+
+    if not user:
+        flash("Email không tồn tại!", "error")
+        return redirect("/forgot-password")
+
+    # Tạo token đặt lại mật khẩu
+    token = hashlib.sha256(f"{email}{time.time()}".encode()).hexdigest()
+
+    # Lưu token tạm vào session
+    session["reset_email"] = email
+    session["reset_token"] = token
+
+    # Link đặt lại mật khẩu
+    reset_link = f"http://127.0.0.1:5000/reset-password/{token}"
+
+    send_email(email, f"Hãy nhấn vào link để đặt lại mật khẩu: {reset_link}")
+
+    flash("Link đặt lại mật khẩu đã được gửi qua email!", "success")
+    return redirect("/login")
+import re
+
+
+
+@app.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    if token != session.get("reset_token"):
+        return "Token không hợp lệ hoặc đã hết hạn!"
+
+    if request.method == "GET":
+        return render_template("reset_password.html")
+
+    new_password = request.form.get("password")
+
+    # KIỂM TRA MẬT KHẨU
+    if len(new_password) < 7:
+        flash("Mật khẩu phải ít nhất 7 ký tự!", "danger")
+        return render_template("reset_password.html")
+
+    if not re.search(r"[A-Z]", new_password):
+        flash("Mật khẩu phải có ít nhất 1 chữ hoa!", "danger")
+        return render_template("reset_password.html")
+
+    if not re.search(r"[a-z]", new_password):
+        flash("Mật khẩu phải có ít nhất 1 chữ thường!", "danger")
+        return render_template("reset_password.html")
+
+    if not re.search(r"[0-9]", new_password):
+        flash("Mật khẩu phải có ít nhất 1 số!", "danger")
+        return render_template("reset_password.html")
+
+    if not re.search(r"[\W_]", new_password):
+        flash("Mật khẩu phải có ít nhất 1 ký tự đặc biệt!", "danger")
+        return render_template("reset_password.html")
+
+    # Cập nhật mật khẩu
+    hashed = generate_password_hash(new_password)
+    email = session.get("reset_email")
+
+    db = get_db()
+    db.execute("UPDATE users SET password=? WHERE email=?", (hashed, email))
+    db.commit()
+
+    session.pop("reset_email", None)
+    session.pop("reset_token", None)
+
+    flash("Đặt lại mật khẩu thành công! Hãy đăng nhập.", "success")
+    return redirect("/login")
+
+
+@app.route("/account")
+def account():
+    if not is_logged_in():
+        return redirect(url_for("login"))
+
+    db = get_db()
+    user = db.execute("SELECT * FROM users WHERE id=?", (session["user_id"],)).fetchone()
+
+    return render_template("account.html", user=user)
 
 # =========================================================
 # GOOGLE LOGIN

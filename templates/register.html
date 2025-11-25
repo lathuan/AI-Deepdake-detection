@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -27,129 +28,131 @@
         }
     </style>
 </head>
+
 <body>
 
-<nav class="navbar">
-    <div class="nav-left">
-        <a class="nav-logo" href="/">DeepfakeDetect</a>
-    </div>
-    <div class="nav-right">
-        <a href="/login">Login</a>
-        <a href="/register" class="btn-primary">Register</a>
-    </div>
-</nav>
+    <nav class="navbar">
+        <div class="nav-left">
+            <a class="nav-logo" href="/">DeepfakeDetect</a>
+        </div>
+        <div class="nav-right">
+            <a href="/login">Login</a>
+            <a href="/register" class="btn-primary">Register</a>
+        </div>
+    </nav>
 
-<main class="container">
-    <div class="auth-box">
-        <h2>Create Account</h2>
+    <main class="container">
+        <div class="auth-box">
+            <h2>Create Account</h2>
 
-        <!-- FLASH MESSAGE TỪ FLASK -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
+            <!-- FLASH MESSAGE TỪ FLASK -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
             <div class="flash-messages">
                 {% for category, message in messages %}
-                    <div class="alert {{ category }}">{{ message }}</div>
+                <div class="alert {{ category }}">{{ message }}</div>
                 {% endfor %}
             </div>
-        {% endif %}
-        {% endwith %}
+            {% endif %}
+            {% endwith %}
 
-        <!-- HIỂN THỊ LỖI FRONT-END -->
-        <div class="error-box" id="errorBox"></div>
+            <!-- HIỂN THỊ LỖI FRONT-END -->
+            <div class="error-box" id="errorBox"></div>
 
-        <form id="registerForm" method="POST" action="/register">
+            <form id="registerForm" method="POST" action="/register">
 
-            <label>Name</label>
-            <input type="text" name="name" required>
+                <label>Name</label>
+                <input type="text" name="name" required>
 
-            <label>Email</label>
-            <input type="email" name="email" required>
+                <label>Email</label>
+                <input type="email" name="email" required>
 
-            <label>Password</label>
-            <input type="password" name="password" id="password" required>
+                <label>Password</label>
+                <input type="password" name="password" id="password" required>
 
-            <div class="password-rules">
-                <span>• Tối thiểu 7 ký tự</span>
-                <span>• Chứa ít nhất 1 chữ in hoa (A–Z)</span>
-                <span>• Chứa ít nhất 1 ký tự đặc biệt (!@#$%^&*)</span>
-            </div>
+                <div class="password-rules">
+                    <span>• Tối thiểu 7 ký tự</span>
+                    <span>• Chứa ít nhất 1 chữ in hoa (A–Z)</span>
+                    <span>• Chứa ít nhất 1 ký tự đặc biệt (!@#$%^&*)</span>
+                </div>
 
-            <button type="submit" class="btn-primary">Register</button>
-        </form>
+                <button type="submit" class="btn-primary">Register</button>
+            </form>
 
-        <p>Already have an account? <a href="/login">Login</a></p>
+            <p>Already have an account? <a href="/login">Login</a></p>
+        </div>
+    </main>
+
+    <div class="oauth-box">
+        <hr>
+        <p>Or register with</p>
+
+        <a href="/auth/google" class="btn-google">
+            <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google Logo">
+            Continue with Google
+        </a>
     </div>
-</main>
 
-<div class="oauth-box">
-    <hr>
-    <p>Or register with</p>
+    <style>
+        .btn-google {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: center;
+            background: white;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+            color: #444;
+            margin-top: 10px;
+        }
 
-    <a href="/auth/google" class="btn-google">
-        <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google Logo">
-        Continue with Google
-    </a>
-</div>
+        .btn-google img {
+            width: 20px;
+            height: 20px;
+        }
 
-<style>
-.btn-google {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    justify-content: center;
-    background: white;
-    border: 1px solid #ccc;
-    padding: 10px;
-    border-radius: 6px;
-    text-decoration: none;
-    font-weight: bold;
-    color: #444;
-    margin-top: 10px;
-}
+        .oauth-box {
+            text-align: center;
+            margin-top: 20px;
+        }
+    </style>
 
-.btn-google img {
-    width: 20px;
-    height: 20px;
-}
+    <!-- CLIENT VALIDATION -->
+    <script>
+        document.getElementById("registerForm").addEventListener("submit", function (e) {
+            let pass = document.getElementById("password").value;
+            let errorBox = document.getElementById("errorBox");
 
-.oauth-box {
-    text-align: center;
-    margin-top: 20px;
-}
-</style>
+            const special = "!@#$%^&*()_+-=[]{}|;:',.<>/?`~";
 
-<!-- CLIENT VALIDATION -->
-<script>
-document.getElementById("registerForm").addEventListener("submit", function(e) {
-    let pass = document.getElementById("password").value;
-    let errorBox = document.getElementById("errorBox");
+            if (pass.length < 7) {
+                errorBox.innerText = "Mật khẩu phải từ 7 ký tự trở lên!";
+                errorBox.style.display = "block";
+                e.preventDefault();
+                return;
+            }
 
-    const special = "!@#$%^&*()_+-=[]{}|;:',.<>/?`~";
+            if (!/[A-Z]/.test(pass)) {
+                errorBox.innerText = "Mật khẩu phải có ít nhất 1 chữ in hoa!";
+                errorBox.style.display = "block";
+                e.preventDefault();
+                return;
+            }
 
-    if (pass.length < 7) {
-        errorBox.innerText = "Mật khẩu phải từ 7 ký tự trở lên!";
-        errorBox.style.display = "block";
-        e.preventDefault();
-        return;
-    }
+            if (![...pass].some(c => special.includes(c))) {
+                errorBox.innerText = "Mật khẩu phải có ít nhất 1 ký tự đặc biệt!";
+                errorBox.style.display = "block";
+                e.preventDefault();
+                return;
+            }
 
-    if (!/[A-Z]/.test(pass)) {
-        errorBox.innerText = "Mật khẩu phải có ít nhất 1 chữ in hoa!";
-        errorBox.style.display = "block";
-        e.preventDefault();
-        return;
-    }
-
-    if (![...pass].some(c => special.includes(c))) {
-        errorBox.innerText = "Mật khẩu phải có ít nhất 1 ký tự đặc biệt!";
-        errorBox.style.display = "block";
-        e.preventDefault();
-        return;
-    }
-
-    errorBox.style.display = "none";
-});
-</script>
+            errorBox.style.display = "none";
+        });
+    </script>
 
 </body>
+
 </html>

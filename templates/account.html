@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard</title>
+    <title>Account</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
 
+<body>
     <nav class="navbar">
         <div class="nav-left">
             <a class="nav-logo" href="/">DeepfakeDetect</a>
@@ -15,24 +15,21 @@
 
         <div class="nav-right">
             <a href="/dashboard">Dashboard</a>
-            <a href="/account">Account</a>
             <a href="/logout" class="btn-logout">Logout</a>
         </div>
     </nav>
 
     <main class="container">
-        <h2>Welcome!</h2>
+        <h2>Thông tin tài khoản</h2>
 
-        <div class="upload-box">
-            <h3>Upload a video to detect deepfake</h3>
+        <div class="auth-box">
+            <p><strong>Tên:</strong> {{ user.username }}</p>
+            <p><strong>Email:</strong> {{ user.email }}</p>
 
-            <form method="POST" action="/dashboard" enctype="multipart/form-data">
-                <input type="file" name="video" accept="video/*" required>
-                <button class="btn-primary" type="submit">Analyze Video</button>
-            </form>
+            <a href="/change-password">
+                <button class="btn-primary">Đổi mật khẩu</button>
+            </a>
         </div>
-
-        <div id="result"></div>
     </main>
 
 </body>
