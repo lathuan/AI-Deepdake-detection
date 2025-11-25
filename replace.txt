@@ -1,0 +1,4 @@
+GLOBALS
+	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=REDACTED
+	680496606730-nn1rhlrf6tau1920slnpclikmij31srs.apps.googleusercontent.com=REDACTED
+END

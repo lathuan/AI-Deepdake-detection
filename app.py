@@ -12,6 +12,10 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import hashlib
+import time
+
+# OAuth
+from authlib.integrations.flask_client import OAuth
 
 # Fix matplotlib
 import matplotlib
@@ -28,8 +32,9 @@ RECAPTCHA_SECRET = "6LfPWBYsAAAAAHU-CUw4F68N6zyksBQYUe7kM2DB"
 EMAIL_ADDRESS = "nghoanglam1395@gmail.com"
 EMAIL_PASSWORD = "yghqackzlcccnmsw"   # APP PASSWORD
 
+
 # ---------------------------------------------------------
-# SEND EMAIL FUNCTION  ←←← BẠN THIẾU HÀM NÀY
+# SEND EMAIL FUNCTION
 # ---------------------------------------------------------
 def send_email(to_email, message):
 
@@ -56,9 +61,31 @@ def send_email(to_email, message):
 # ---------------------------------------------------------
 DATABASE = "deepfake_results.db"
 
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = False
+
+# ---------------------------------------------------------
+# GOOGLE LOGIN FIX — ĐANG DÙNG BẢN CHUẨN NHẤT
+# ---------------------------------------------------------
+oauth = OAuth(app)
+oauth.register(
+    name="google",
+    client_id="xxx",
+    client_secret="xxx",
+    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+    userinfo_endpoint='https://openidconnect.googleapis.com/v1/userinfo',
+
+    client_kwargs={
+        "scope": "openid email profile"
+    }
+)
+
+# ---------------------------
+# Database helper
+# ---------------------------
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(DATABASE)
+        g.db = sqlite3.connect(DATABASE, check_same_thread=False)
         g.db.row_factory = sqlite3.Row
     return g.db
 
@@ -68,14 +95,10 @@ def close_db(exception):
     if db:
         db.close()
 
-# ---------------------------------------------------------
-# AUTO CREATE TABLES IF NOT EXISTS
-# ---------------------------------------------------------
 def init_db():
     conn = sqlite3.connect(DATABASE)
     cur = conn.cursor()
 
-    # USERS TABLE
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,7 +108,6 @@ def init_db():
     );
     """)
 
-    # DEVICES TABLE
     cur.execute("""
     CREATE TABLE IF NOT EXISTS devices (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,25 +121,28 @@ def init_db():
 
     conn.commit()
     conn.close()
-    print("Database initialized! Tables are ready.")
 
-# ---------------------------------------------------------
-# CREATE DEVICE HASH
-# ---------------------------------------------------------
+# ---------------------------
+# Device / OTP
+# ---------------------------
 def generate_device_hash(request):
     ua = request.headers.get("User-Agent", "")
     ip = request.remote_addr or "0.0.0.0"
-    raw = ua + ip
+    raw = ua + "|" + ip
     return hashlib.sha256(raw.encode()).hexdigest()
 
-# ---------------------------------------------------------
-# ROUTES
-# ---------------------------------------------------------
+def is_logged_in():
+    return "user_id" in session
+
+
+# ---------------------------
+# Routes
+# ---------------------------
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", logged=is_logged_in())
 
-# ================= REGISTER =================
+# Register
 @app.route("/register", methods=["GET"])
 def register_page():
     return render_template("register.html")
@@ -133,19 +158,16 @@ def register_submit():
 
     hashed_pw = generate_password_hash(password)
     db = get_db()
-
     try:
-        db.execute(
-            "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
-            (name, email, hashed_pw)
-        )
+        db.execute("INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
+                   (name, email, hashed_pw))
         db.commit()
     except sqlite3.IntegrityError:
-        return jsonify({"error": "Email already exists"}), 400
+        return jsonify({"error": "Email exists"}), 400
 
-    return jsonify({"message": "Register success!"})
+    return jsonify({"message": "Register OK"})
 
-# ================= LOGIN =================
+# Login
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
@@ -154,41 +176,97 @@ def login():
     email = request.form.get("email")
     password = request.form.get("password")
 
-    user = get_db().execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    db = get_db()
+    user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if not user or not check_password_hash(user["password"], password):
         return "Sai tài khoản hoặc mật khẩu!"
 
-    # 1. DEVICE HASH
+    # Device verification
     device_hash = generate_device_hash(request)
-
-    # 2. CHECK DEVICE
-    db = get_db()
     device = db.execute(
-        "SELECT * FROM devices WHERE user_id = ? AND device_hash = ?",
+        "SELECT * FROM devices WHERE user_id=? AND device_hash=?",
         (user["id"], device_hash)
     ).fetchone()
 
     if device:
         session["user_id"] = user["id"]
         resp = make_response(redirect(url_for("index")))
-        resp.set_cookie("device_id", device_hash, max_age=60*60*24*365)
+        resp.set_cookie("device_id", device_hash)
         return resp
 
-    # 3. NEW DEVICE → SEND OTP
     otp = str(random.randint(100000, 999999))
     session["pending_user"] = user["id"]
     session["pending_device"] = device_hash
     session["otp"] = otp
+    session["last_otp_time"] = time.time()
 
-    send_email(email, f"Thiết bị mới phát hiện. Mã OTP của bạn: {otp}")
+    send_email(user["email"], f"Mã OTP: {otp}")
+    return render_template("verify_device.html", message="Thiết bị mới! Nhập OTP")
 
-    return render_template("verify_device.html", message="Thiết bị mới! Nhập OTP để tiếp tục.")
+# ---------------------------
+# GOOGLE LOGIN ROUTES
+# ---------------------------
+@app.route("/auth/google")
+def auth_google():
+    redirect_uri = url_for("auth_google_callback", _external=True)
+    return oauth.google.authorize_redirect(redirect_uri)
 
-# ================= VERIFY NEW DEVICE =================
+@app.route("/auth/google/callback")
+def auth_google_callback():
+    token = oauth.google.authorize_access_token()
+
+    # LẤY USERINFO CHUẨN OPENID — FIX LỖI MissingSchema
+    resp = oauth.google.get("https://openidconnect.googleapis.com/v1/userinfo")
+    userinfo = resp.json()
+
+    email = userinfo.get("email")
+    name = userinfo.get("name")
+
+    if not email:
+        return "Không thể lấy email từ Google!"
+
+    db = get_db()
+    user = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+
+    if not user:
+        db.execute(
+            "INSERT INTO users (username, email, password) VALUES (?, ?, '')",
+            (name, email)
+        )
+        db.commit()
+        user = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+
+    # Device verify
+    device_hash = generate_device_hash(request)
+    device = db.execute(
+        "SELECT * FROM devices WHERE user_id=? AND device_hash=?",
+        (user["id"], device_hash)
+    ).fetchone()
+
+    if device:
+        session["user_id"] = user["id"]
+        resp = make_response(redirect(url_for("index")))
+        resp.set_cookie("device_id", device_hash)
+        return resp
+
+    otp = str(random.randint(100000, 999999))
+    session["pending_user"] = user["id"]
+    session["pending_device"] = device_hash
+    session["otp"] = otp
+    session["last_otp_time"] = time.time()
+
+    send_email(email, f"Mã OTP: {otp}")
+    return render_template("verify_device.html", message="Thiết bị mới! Nhập OTP")
+
+# Verify device
+# ---------------------------
 @app.route("/verify-device", methods=["POST"])
 def verify_device():
     user_otp = request.form.get("otp")
     real_otp = session.get("otp")
+
+    if not real_otp:
+        return render_template("verify_device.html", message="Hết hạn OTP")
 
     if user_otp != real_otp:
         return render_template("verify_device.html", message="OTP sai!")
@@ -203,50 +281,68 @@ def verify_device():
     )
     db.commit()
 
-    session.pop("otp", None)
-    session.pop("pending_user", None)
-    session.pop("pending_device", None)
-
+    session.clear()
     session["user_id"] = user_id
+
     resp = make_response(redirect(url_for("index")))
-    resp.set_cookie("device_id", device_hash, max_age=60*60*24*365)
+    resp.set_cookie("device_id", device_hash)
 
     return resp
+
+# ---------------------------
+# Resend OTP
+# ---------------------------
 @app.route("/resend-otp")
 def resend_otp():
-    user_id = session.get("pending_user")
-    device_hash = session.get("pending_device")
+    last = session.get("last_otp_time", 0)
+    now = time.time()
 
-    if not user_id or not device_hash:
-        return redirect(url_for("login"))
+    if now - last < 60:
+        wait = 60 - int(now - last)
+        return render_template("verify_device.html", message=f"Chờ {wait} giây để gửi lại OTP")
 
-    # Lấy email user
-    db = get_db()
-    user = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-
-    if not user:
-        return redirect(url_for("login"))
-
-    # Tạo OTP mới
     otp = str(random.randint(100000, 999999))
     session["otp"] = otp
+    session["last_otp_time"] = now
 
-    # Gửi mail
-    send_email(user["email"], f"Mã OTP mới của bạn: {otp}")
+    db = get_db()
+    user = db.execute("SELECT * FROM users WHERE id=?", (session["pending_user"],)).fetchone()
 
-    return render_template("verify_device.html",
-                           message="OTP mới đã được gửi lại email!")
+    send_email(user["email"], f"OTP mới: {otp}")
+    return render_template("verify_device.html", message="OTP mới đã gửi!")
 
-
-# ================= LOGOUT =================
+# ---------------------------
+# Logout
+# ---------------------------
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("login"))
 
-# ---------------------------------------------------------
-# RUN
-# ---------------------------------------------------------
+# ---------------------------
+# Video Upload & Predict
+# ---------------------------
+@app.route("/upload", methods=["POST"])
+def upload_video():
+    if not is_logged_in():
+        return jsonify({"error": "Unauthorized"}), 403
+
+    if "video" not in request.files:
+        return jsonify({"error": "No file"}), 400
+
+    video = request.files["video"]
+    path = os.path.join("examples_test_videos", video.filename)
+    video.save(path)
+
+    result = predict_deepfake(path)
+    os.remove(path)
+
+    return jsonify(result)
+
+# ---------------------------
+# Run
+# ---------------------------
 if __name__ == "__main__":
     init_db()
+    os.makedirs("examples_test_videos", exist_ok=True)
     app.run(host="0.0.0.0", port=5000, debug=True)
