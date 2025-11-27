@@ -243,7 +243,9 @@ def login():
     session["pending_user"] = user["id"]
     session["pending_device"] = device_hash
     session["otp"] = otp
+    session["otp_expire"] = time.time() + 60      # OTP chỉ tồn tại 60 giây
     session["last_otp_time"] = time.time()
+
 
     send_email(user["email"], f"Mã OTP xác minh thiết bị của bạn là: {otp}")
 
@@ -380,9 +382,11 @@ def auth_google_callback():
         return resp
 
     otp = str(random.randint(100000, 999999))
+
     session["pending_user"] = user["id"]
     session["pending_device"] = device_hash
     session["otp"] = otp
+    session["otp_expire"] = time.time() + 60      # OTP chỉ tồn tại 60 giây
     session["last_otp_time"] = time.time()
 
     send_email(email, f"Mã OTP: {otp}")
@@ -398,14 +402,23 @@ def verify_device():
     user_otp = request.form.get("otp")
     real_otp = session.get("otp")
 
+    # Không có OTP trong session
     if not real_otp:
-        flash("OTP đã hết hạn!", "error")
+        flash("OTP đã hết hạn! Vui lòng yêu cầu mã mới.", "error")
         return render_template("verify_device.html")
 
+    # Kiểm tra hết hạn 60s
+    expire = session.get("otp_expire", 0)
+    if time.time() > expire:
+        flash("OTP đã hết hạn! Vui lòng yêu cầu mã mới.", "error")
+        return render_template("verify_device.html")
+
+    # Sai OTP
     if user_otp != real_otp:
-        flash("OTP sai!", "error")
+        flash("OTP không đúng!", "error")
         return render_template("verify_device.html")
 
+    # OTP đúng → lưu thiết bị
     user_id = session.get("pending_user")
     device_hash = session.get("pending_device")
 
@@ -440,6 +453,7 @@ def resend_otp():
 
     otp = str(random.randint(100000, 999999))
     session["otp"] = otp
+    session["otp_expire"] = time.time() + 60   # OTP mới tồn tại thêm 60s
     session["last_otp_time"] = now
 
     db = get_db()

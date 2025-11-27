@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Verify Device</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body>
 
     <nav class="navbar">
@@ -24,15 +26,20 @@
             <h2>Verify New Device</h2>
 
             <p>
-                We detected a new device or browser.  
+                We detected a new device or browser.
                 Please enter the OTP code sent to your email to continue.
             </p>
 
-            {% if message %}
-            <p style="color: red; font-weight: bold; text-align:center;">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}" style="color:red; font-weight:bold;">
                 {{ message }}
-            </p>
+            </div>
+            {% endfor %}
             {% endif %}
+            {% endwith %}
+
 
             <form method="POST" action="/verify-device">
                 <label>OTP Code</label>
@@ -51,4 +58,5 @@
     </main>
 
 </body>
+
 </html>
