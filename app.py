@@ -348,9 +348,16 @@ def auth_google():
 
 @app.route("/auth/google/callback")
 def auth_google_callback():
-    token = oauth.google.authorize_access_token()
-    resp = oauth.google.get("https://openidconnect.googleapis.com/v1/userinfo")
-    userinfo = resp.json()
+    try:
+        token = oauth.google.authorize_access_token()
+    except Exception as e:
+        return f"OAuth failed: {e}"
+
+    # LẤY THÔNG TIN USER ĐÚNG CÁCH
+    userinfo = oauth.google.userinfo()
+
+    if userinfo is None:
+        return "Không thể lấy thông tin Google!"
 
     email = userinfo.get("email")
     name = userinfo.get("name")
@@ -369,6 +376,7 @@ def auth_google_callback():
         db.commit()
         user = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
 
+    # KIỂM TRA THIẾT BỊ
     device_hash = generate_device_hash(request)
     device = db.execute(
         "SELECT * FROM devices WHERE user_id=? AND device_hash=?",
@@ -378,19 +386,21 @@ def auth_google_callback():
     if device:
         session["user_id"] = user["id"]
         resp = make_response(redirect(url_for("index")))
-        resp.set_cookie("device_id", device_hash)
+        resp.set_cookie("device_id", device_hash, max_age=86400 * 30)
         return resp
 
+    # THIẾT BỊ MỚI → GỬI OTP
     otp = str(random.randint(100000, 999999))
 
     session["pending_user"] = user["id"]
     session["pending_device"] = device_hash
     session["otp"] = otp
-    session["otp_expire"] = time.time() + 60      # OTP chỉ tồn tại 60 giây
+    session["otp_expire"] = time.time() + 60
     session["last_otp_time"] = time.time()
 
-    send_email(email, f"Mã OTP: {otp}")
-    flash("Thiết bị mới! Nhập OTP", "info")
+    send_email(email, f"Mã OTP của bạn là: {otp}")
+
+    flash("Thiết bị mới! Vui lòng nhập OTP để xác minh.", "info")
     return render_template("verify_device.html")
 
 
@@ -551,4 +561,5 @@ def upload_video():
 if __name__ == "__main__":
     init_db()
     os.makedirs("examples_test_videos", exist_ok=True)
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # Use 127.0.0.1 explicitly for the development server (Cách A)
+    app.run(host="127.0.0.1", port=5000, debug=False)
