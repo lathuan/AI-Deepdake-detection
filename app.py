@@ -29,8 +29,8 @@ app.secret_key = "2a2fd639618205a5bbbc40f0b64f64d8b8e61c417ea9e7bde08360a15ad8c9
 RECAPTCHA_SECRET = "6LfPWBYsAAAAAHU-CUw4F68N6zyksBQYUe7kM2DB"
 
 # Gmail settings
-EMAIL_ADDRESS = "nghoanglam1395@gmail.com"
-EMAIL_PASSWORD = "yghqackzlcccnmsw"   # APP PASSWORD
+EMAIL_ADDRESS = "webdeepfake@gmail.com"
+EMAIL_PASSWORD = "acql muop kmgv qmqu"   # APP PASSWORD
 
 # ---------------------------------------------------------
 # SEND EMAIL FUNCTION
