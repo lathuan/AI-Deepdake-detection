@@ -1,77 +1,270 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Deepfake Detection</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="nav-left">
-            <a href="/" class="nav-logo">DeepfakeDetect</a>
+    <!-- Background Glow -->
+    <div class="bg-glow main-glow"></div>
+    <div class="bg-glow top-right-glow"></div>
+    <div class="bg-glow bottom-left-glow"></div>
+
+    <!-- NAVBAR -->
+    <nav class="header">
+        <div class="logo">
+            <a href="/" class="nav-logo">
+                <div class="site-icon"></div>
+                <h1>Deepfake AI</h1>
+            </a>
+        </div>
+        <div class="nav-links">
+            <a href="/" class="nav-item">{{ t.dashboard }}</a>
+            <a href="/history" class="nav-item">{{ t.history }}</a>
+            <a href="/settings" class="nav-item">{{ t.settings }}</a>
+        </div>
+
+        <div class="user-profile" id="userProfileButton">
+            <img src="{{ user.icon_url }}" class="user-icon">
         </div>
     </nav>
 
+    <!-- PROFILE PANEL -->
+    <div class="profile-panel" id="profilePanel">
+        <div class="profile-header">
+            <img src="{{ user.icon_url }}" class="profile-icon">
+            <div class="profile-info">
+                <span class="profile-username">{{ user.username }}</span>
+                <span class="profile-tagline">{{ user.tagline }}</span>
+            </div>
+        </div>
+
+        <div class="profile-menu-grid">
+            <div class="menu-item" onclick="window.location.href='/settings'">{{ t.settings }}</div>
+            <div class="menu-item" onclick="window.location.href='/logout'">{{ t.logout }}</div>
+        </div>
+    </div>
+
     <main class="container">
-        <h1>AI Deepfake Detection</h1>
-        <p>Upload video và nhận phân tích chi tiết từ AI</p>
+        <!-- HERO SECTION -->
+        <div class="hero-section">
+            <h1>{{ t.hero_title }}</h1>
+            <p class="tagline">{{ t.tagline }}</p>
+        </div>
 
-        <input type="file" id="videoInput" accept="video/*">
-        <button id="uploadBtn">Detect Deepfake</button>
+        <!-- UPLOAD PANEL -->
+        <section class="panel upload-section">
+            <h2>{{ t.upload_section }}</h2>
 
-        <div id="result" class="result"></div>
+            <div class="input-controls">
+                <label for="videoInput">{{ t.select_video }}</label>
+                <input type="file" id="videoInput" class="custom-file-input" accept="video/*">
+                <div id="videoInputName">{{ t.no_file }}</div>
+            </div>
+
+            <button id="uploadBtn">
+                {{ t.analyze }}
+                <div class="spinner" id="uploadSpinner" style="display:none;"></div>
+            </button>
+
+            <p class="instruction">{{ t.supported_formats }}</p>
+        </section>
+
+        <!-- SAVE HISTORY NOTIFICATION -->
+        <div id="saveHistoryNotification" class="save-history-notification">
+            <p>{{ t.save_to_history|replace('{}', '<strong><span id="notifyFilename"></span></strong>')|safe }}</p>
+            <div class="notification-buttons">
+                <button id="notifySaveBtn" class="btn-save">{{ t.save }}</button>
+                <button id="notifyDiscardBtn" class="btn-discard">{{ t.discard }}</button>
+            </div>
+            <p id="notifyMessage"></p>
+        </div>
+
+        <!-- LIVE RESULT (from new prediction) -->
+        <section class="panel" id="resultSection" style="display:none;">
+            <h2>{{ t.analysis_result }}</h2>
+
+            <div class="prediction-summary" id="predictionBox">
+                <h3>{{ t.prediction }}:</h3>
+                <div class="prediction-value" id="predictionText"></div>
+                <p id="confidenceText"></p>
+            </div>
+
+            <h4 id="timelineHeader" class="analysis-header" style="display:none;">{{ t.suspicious_timeline }}</h4>
+            <img id="timelineImg" class="timeline-img" style="display:none;">
+
+            <h4 class="analysis-header">{{ t.suspicious_frames }}</h4>
+            <div id="framesGallery" class="frame-gallery"></div>
+        </section>
     </main>
 
-    <script>
-        const btn = document.getElementById("uploadBtn");
-        const input = document.getElementById("videoInput");
-        const resultDiv = document.getElementById("result");
+<script>
+// Áp dụng theme khi tải trang
+document.addEventListener('DOMContentLoaded', function() {
+    document.documentElement.setAttribute('data-theme', '{{ theme }}');
+});
 
-        btn.addEventListener("click", async () => {
-            if (!input.files[0]) { alert("Chọn video trước!"); return; }
-            const formData = new FormData();
-            formData.append("video", input.files[0]);
+/* PROFILE PANEL */
+const profileBtn = document.getElementById("userProfileButton");
+const profilePanel = document.getElementById("profilePanel");
+profileBtn.addEventListener("click", () => profilePanel.classList.toggle("open"));
+document.addEventListener("click", e => {
+    if (!profilePanel.contains(e.target) && !profileBtn.contains(e.target))
+        profilePanel.classList.remove("open");
+});
 
-            resultDiv.innerHTML = "<p>🔄 Processing video...</p>";
+/* ELEMENTS */
+const uploadBtn = document.getElementById("uploadBtn");
+const videoInput = document.getElementById("videoInput");
+const videoInputName = document.getElementById("videoInputName");
+const uploadSpinner = document.getElementById("uploadSpinner");
 
-            const resp = await fetch("/upload", { method: "POST", body: formData });
-            const data = await resp.json();
+const resultSection = document.getElementById("resultSection");
+const predictionBox = document.getElementById("predictionBox");
+const predictionText = document.getElementById("predictionText");
+const confidenceText = document.getElementById("confidenceText");
+const timelineHeader = document.getElementById("timelineHeader");
+const timelineImg = document.getElementById("timelineImg");
+const framesGallery = document.getElementById("framesGallery");
 
-            if (data.error) {
-                resultDiv.innerHTML = `<p>❌ ${data.error}</p>`;
-                return;
-            }
+const saveHistoryNotification = document.getElementById("saveHistoryNotification");
+const notifyFilename = document.getElementById("notifyFilename");
+const notifySaveBtn = document.getElementById("notifySaveBtn");
+const notifyDiscardBtn = document.getElementById("notifyDiscardBtn");
+const notifyMessage = document.getElementById("notifyMessage");
 
-            let html = `<h2>Prediction: ${data.prediction}</h2>`;
-            html += `<p>Confidence: ${(data.confidence*100).toFixed(1)}%</p>`;
-            html += `<p>Probability FAKE: ${data.probability.toFixed(3)}</p>`;
-            html += `<p>Number of faces detected: ${data.num_faces}</p>`;
+let currentTempId = null;
+let currentFilename = null;
 
-            // Hiển thị frame + heatmap
-            if (data.frames_base64.length > 0) {
-                html += "<h3>Frames Nghi Ngờ:</h3>";
-                data.frames_base64.forEach(frame => {
-                    html += `<div style="display:inline-block; margin:10px; text-align:center;">
-                                <img src="data:image/png;base64,${frame.face_base64}" class="face-img"><br>
-                                Conf: ${(frame.confidence*100).toFixed(1)}%<br>`;
-                    if(frame.heatmap_base64){
-                        html += `<img src="data:image/png;base64,${frame.heatmap_base64}" class="timeline-img">`;
-                    }
-                    html += "</div>";
-                });
-            }
+/* FILE SELECT */
+videoInput.addEventListener("change", () => {
+    const f = videoInput.files[0];
+    videoInputName.textContent = f ? f.name : "{{ t.no_file }}";
+    currentFilename = f ? f.name : null;
+});
 
-            // Timeline
-            if (data.timeline_base64) {
-                html += "<h3>Confidence Timeline:</h3>";
-                html += `<img src="data:image/png;base64,${data.timeline_base64}" class="timeline-img">`;
-            }
+/* RENDER RESULT */
+function renderResults(data) {
+    const isFake = data.prediction === "FAKE";
+    predictionBox.style.borderColor = isFake ? "var(--red-fake)" : "var(--green-real)";
+    predictionBox.style.boxShadow = `0 0 15px ${isFake ? "var(--red-fake)" : "var(--green-real)"}`;
 
-            resultDiv.innerHTML = html;
+    predictionText.textContent = data.prediction;
+    predictionText.className = `prediction-value ${isFake ? "fake" : "real"}`;
+
+    confidenceText.textContent = `{{ t.confidence }}: ${(data.confidence * 100).toFixed(2)}%`;
+
+    /* TIMELINE */
+    if (data.timeline_base64) {
+        timelineImg.src = "data:image/png;base64," + data.timeline_base64;
+        timelineImg.style.display = "block";
+        timelineHeader.style.display = "block";
+    }
+
+    /* FRAMES */
+    framesGallery.innerHTML = "";
+    if (data.frames_base64) {
+        data.frames_base64.forEach(f => {
+            const box = document.createElement("div");
+            box.className = "frame-item";
+            box.style.borderColor = f.is_suspicious ? "var(--red-fake)" : "var(--accent-purple)";
+
+            box.innerHTML = `
+                <p>Frame ${f.frame_index}</p>
+                <div class="comp-box">
+                    <h4>{{ t.detected_face }}</h4>
+                    <img src="data:image/jpeg;base64,${f.face_base64}" class="face-img">
+                </div>
+                <div class="comp-box">
+                    <h4>{{ t.heatmap }}</h4>
+                    <img src="data:image/jpeg;base64,${f.heatmap_base64}" class="face-img">
+                </div>
+                <p class="confidence-label">{{ t.confidence }}: ${(f.confidence * 100).toFixed(2)}%</p>
+            `;
+            framesGallery.appendChild(box);
         });
-    </script>
+    }
+}
+
+/* UPLOAD CLICK */
+uploadBtn.addEventListener("click", async () => {
+    const file = videoInput.files[0];
+    if (!file) {
+        alert("Please select a video.");
+        return;
+    }
+
+    uploadSpinner.style.display = "inline-block";
+    uploadBtn.disabled = true;
+
+    const form = new FormData();
+    form.append("video", file);
+
+    try {
+        const res = await fetch("/upload", { method: "POST", body: form });
+        const data = await res.json();
+
+        uploadSpinner.style.display = "none";
+        uploadBtn.disabled = false;
+
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+
+        resultSection.style.display = "block";
+        renderResults(data);
+
+        currentTempId = data.temp_id;
+        notifyFilename.textContent = currentFilename;
+        saveHistoryNotification.style.display = "flex";
+
+    } catch (e) {
+        console.error("Upload error:", e);
+        alert("Upload failed.");
+        uploadSpinner.style.display = "none";
+        uploadBtn.disabled = false;
+    }
+});
+
+/* SAVE/DISCARD HISTORY */
+async function handleSaveHistory(save) {
+    if(!currentTempId) return;
+    notifyMessage.textContent = "Processing...";
+    try {
+        const res = await fetch("/save_history", {
+            method:"POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ temp_id: currentTempId, save })
+        });
+        const data = await res.json();
+        notifyMessage.textContent = data.message;
+        setTimeout(() => {
+            saveHistoryNotification.style.display = "none";
+            currentTempId = null;
+            notifyMessage.textContent = "";
+        }, 1500);
+    } catch(e) {
+        console.error(e);
+        notifyMessage.textContent = "Failed to save history.";
+        setTimeout(() => {
+            saveHistoryNotification.style.display = "none";
+            currentTempId = null;
+            notifyMessage.textContent = "";
+        }, 1500);
+    }
+}
+
+notifySaveBtn.addEventListener("click", () => handleSaveHistory(true));
+notifyDiscardBtn.addEventListener("click", () => handleSaveHistory(false));
+
+document.addEventListener('DOMContentLoaded', function() {
+    const currentTheme = '{{ theme }}';
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    console.log('Theme applied:', currentTheme); // Debug log
+});
+</script>
 </body>
 </html>
-                                                                 
