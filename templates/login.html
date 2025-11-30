@@ -1,83 +1,101 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
-    <link rel="stylesheet" href="/static/style.css">
-
-    <!-- GOOGLE reCAPTCHA SCRIPT -->
+    <title>Login - Deepfake Detection</title>
+    <link rel="stylesheet" href="../static/style.css">
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 </head>
-
 <body>
+    <!-- Background Elements -->
+    <div class="bg-glow main-glow"></div>
+    <div class="bg-glow top-right-glow"></div>
+    <div class="bg-glow bottom-left-glow"></div>
 
-    <nav class="navbar">
-        <div class="nav-left">
-            <a class="nav-logo" href="/">DeepfakeDetect</a>
-        </div>
+    <div class="auth-container">
+        <div class="auth-card">
+            <!-- Header -->
+            <div class="auth-header">
+                <div class="auth-logo">DEEPFAKE AI</div>
+                <div class="auth-subtitle">Sign in to your account</div>
+            </div>
 
-        <div class="nav-right">
-            <a href="/login">Login</a>
-            <a href="/register" class="btn-primary">Register</a>
-        </div>
-    </nav>
-
-    <main class="container">
-        <div class="auth-box">
-
-            <h2>Login</h2>
-
-            <!-- FLASH MESSAGES -->
+            <!-- Flash Messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
             <div class="flash-messages">
                 {% for category, message in messages %}
-                <div class="alert {{ category }}">{{ message }}</div>
+                <div class="flash-modern flash-{{ category }}">{{ message }}</div>
                 {% endfor %}
             </div>
             {% endif %}
             {% endwith %}
 
-            <form method="POST" action="/login">
+            <!-- Login Form -->
+            <form method="POST" action="/login" id="loginForm">
+                <!-- Email -->
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" name="email" class="form-input" placeholder="Enter your email" required>
+                </div>
 
-                <label>Email</label>
-                <input type="email" name="email" required>
-
-                <label>Password</label>
-                <input type="password" name="password" required>
+                <!-- Password -->
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" name="password" class="form-input" placeholder="Enter your password" required>
+                </div>
 
                 <!-- reCAPTCHA -->
-                <div class="captcha-wrapper">
+                <div class="recaptcha-modern">
                     <div class="g-recaptcha" data-sitekey="6LfPWBYsAAAAADWfym05B1aklwFeW_KLYB2u_54-"></div>
                 </div>
 
-                <button type="submit" class="btn-primary btn-full">
-                    Login
+                <!-- Submit Button -->
+                <button type="submit" class="btn-submit" id="loginBtn">
+                    Sign In
                 </button>
-
-                <!-- OAUTH GOOGLE -->
-                <div class="oauth-box">
-                    <div class="divider">
-                        <span>Or login with</span>
-                    </div>
-
-                    <a href="/auth/google" class="btn-google">
-                        <img src="https://developers.google.com/identity/images/g-logo.png" alt="">
-                        Continue with Google
-                    </a>
-                </div>
-
             </form>
-            
 
-            <p><a href="/forgot-password">Forgot Password?</a></p>
-            <p>Don't have an account? <a href="/register">Register</a></p>
+            <!-- Divider -->
+            <div class="auth-divider">
+                <span>Or continue with</span>
+            </div>
 
+            <!-- OAuth -->
+            <a href="/auth/google" class="btn-oauth">
+                <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google">
+                Continue with Google
+            </a>
+
+            <!-- Links -->
+            <div class="auth-links">
+                <a href="/forgot-password" class="auth-link">Forgot your password?</a>
+                <br>
+                <span style="color: var(--text-subtle);">Don't have an account? </span>
+                <a href="/register" class="auth-link">Create account</a>
+            </div>
         </div>
-    </main>
+    </div>
 
+    <script>
+        // Form loading state
+        document.getElementById('loginForm').addEventListener('submit', function() {
+            const btn = document.getElementById('loginBtn');
+            btn.classList.add('btn-loading');
+            btn.innerHTML = 'Signing In...';
+        });
+
+        // Add input focus effects
+        const inputs = document.querySelectorAll('.form-input');
+        inputs.forEach(input => {
+            input.addEventListener('focus', function() {
+                this.parentElement.classList.add('focused');
+            });
+            input.addEventListener('blur', function() {
+                this.parentElement.classList.remove('focused');
+            });
+        });
+    </script>
 </body>
-
 </html>

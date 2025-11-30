@@ -1,48 +1,49 @@
-
-from flask import Flask, render_template, request, jsonify, session
-import os, io, base64
+from flask import Flask, g, render_template, request, jsonify, session, redirect, url_for, make_response, flash
+import sqlite3
+import os
+import io
+import base64
+import requests
+from werkzeug.security import generate_password_hash, check_password_hash
+from PIL import Image
+from predict import predict_deepfake
+import random
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import hashlib
+import time
+import re
+import uuid
 from datetime import datetime
-import uuid 
-try:
-    from PIL import Image
-except ImportError:
-    print("WARNING: PIL/Pillow is required. Please run: pip install Pillow")
-    exit()
-
-try:
-    from predict import predict_deepfake 
-except ImportError:
-    def predict_deepfake(video_path):
-        import time
-        timeline_img = Image.new('RGB', (600, 150), color = 'blue')
-        buf = io.BytesIO()
-        timeline_img.save(buf, format='PNG') 
-        timeline_b64_string = base64.b64encode(buf.getvalue()).decode()
-        
-        face_img = Image.new('RGB', (100, 100), color = 'red')
-        heatmap_img = Image.new('RGB', (100, 100), color = 'yellow')
-        
-        time.sleep(2) 
-        return {
-            "overall_prediction": "FAKE",
-            "overall_confidence": 0.92,
-            "timeline_base64": timeline_b64_string,
-            "frames_for_web": [
-                {"frame_index": 10, "confidence": 0.88, "is_suspicious": True, "face_image": face_img, "heatmap_overlay": heatmap_img},
-                {"frame_index": 50, "confidence": 0.95, "is_suspicious": True, "face_image": face_img, "heatmap_overlay": heatmap_img}
-            ]
-        }
-    print("INFO: Using mock 'predict_deepfake' function.")
 
 
-app = Flask(__name__)
-app.secret_key = 'super_secret_key_change_me' 
+# OAuth
+from authlib.integrations.flask_client import OAuth
+
+# Fix matplotlib
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+app = Flask(__name__, static_folder='static', template_folder='templates')
+app.secret_key = "2a2fd639618205a5bbbc40f0b64f64d8b8e61c417ea9e7bde08360a15ad8c9ef"
+
+# reCAPTCHA Secret
+RECAPTCHA_SECRET = "6LfPWBYsAAAAAHU-CUw4F68N6zyksBQYUe7kM2DB"
+
+# Gmail settings
+EMAIL_ADDRESS = "webdeepfake@gmail.com"
+EMAIL_PASSWORD = "acql muop kmgv qmqu"   # APP PASSWORD
+
+# Upload folder
 UPLOAD_FOLDER = "examples_test_videos"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-history = [] 
-temp_storage = {} 
+# Global variables for history and temp storage
+history = []
+temp_storage = {}
 
 # Translation dictionaries
 TRANSLATIONS = {
@@ -164,6 +165,105 @@ TRANSLATIONS = {
     }
 }
 
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = False
+
+# ---------------------------------------------------------
+# SEND EMAIL FUNCTION
+# ---------------------------------------------------------
+def send_email(to_email, message):
+    msg = MIMEMultipart()
+    msg["From"] = EMAIL_ADDRESS
+    msg["To"] = to_email
+    msg["Subject"] = "Xác minh thiết bị đăng nhập"
+
+    msg.attach(MIMEText(message, "plain"))
+
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+        print("Email sent successfully!")
+    except Exception as e:
+        print("Error sending email:", e)
+
+# ---------------------------------------------------------
+# DATABASE FILE
+# ---------------------------------------------------------
+DATABASE = "deepfake_results.db"
+
+# ---------------------------------------------------------
+# GOOGLE LOGIN FIX
+# ---------------------------------------------------------
+oauth = OAuth(app)
+oauth.register(
+    name="google",
+    client_id="680496606730-7l1fqt20cdtv5gkoaldaunj55r40jul2.apps.googleusercontent.com",
+    client_secret="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",
+    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+    userinfo_endpoint='https://openidconnect.googleapis.com/v1/userinfo',
+    client_kwargs={"scope": "openid email profile"}
+)
+
+# ---------------------------
+# Database helper
+# ---------------------------
+def get_db():
+    if "db" not in g:
+        g.db = sqlite3.connect(DATABASE, check_same_thread=False)
+        g.db.row_factory = sqlite3.Row
+    return g.db
+
+@app.teardown_appcontext
+def close_db(exception):
+    db = g.pop("db", None)
+    if db:
+        db.close()
+
+def init_db():
+    conn = sqlite3.connect(DATABASE)
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL
+    );
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS devices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        device_hash TEXT NOT NULL,
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id)
+    );
+    """)
+
+    conn.commit()
+    conn.close()
+
+# ---------------------------
+# Device / OTP
+# ---------------------------
+def generate_device_hash(request):
+    ua = request.headers.get("User-Agent", "")
+    ip = request.remote_addr or "0.0.0.0"
+    raw = ua + "|" + ip
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+def is_logged_in():
+    return "user_id" in session
+
+# ---------------------------
+# Helper functions for image processing and translations
+# ---------------------------
 def pil_image_to_base64(img):
     if img is None:
         return None
@@ -186,6 +286,10 @@ def get_user_data():
 
 def get_translations(lang='en'):
     return TRANSLATIONS.get(lang, TRANSLATIONS['en'])
+
+# =========================================================
+# ROUTES
+# =========================================================
 
 @app.route("/")
 def index():
@@ -229,13 +333,16 @@ def update_settings():
     
     return jsonify({"status": "success", "message": "Settings updated successfully"})
 
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "GET":
+        return render_template("register.html")
 
     name = request.form.get("name")
     email = request.form.get("email")
     password = request.form.get("password")
 
     # Password mạnh
-    import re
     if len(password) < 8 or not re.search(r"[A-Z]", password) or not re.search(r"[^A-Za-z0-9]", password):
         flash("Password phải ≥ 8 ký tự, có 1 IN HOA và 1 ký tự đặc biệt!", "error")
         return redirect("/register")
@@ -255,14 +362,6 @@ def update_settings():
     # Thông báo đăng ký thành công
     flash("Đăng ký thành công! Vui lòng đăng nhập.", "success")
     return redirect("/login")
-
-
-# =========================================================
-# LOGIN — FIXED FLASH + SHOW SUCCESS MESSAGE
-# =========================================================
-import requests
-
-RECAPTCHA_SECRET = "6LfPWBYsAAAAAHU-CUw4F68N6zyksBQYUe7kM2DB"  # SECRET KEY đúng
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -328,7 +427,6 @@ def login():
     session["otp_expire"] = time.time() + 60      # OTP chỉ tồn tại 60 giây
     session["last_otp_time"] = time.time()
 
-
     send_email(user["email"], f"Mã OTP xác minh thiết bị của bạn là: {otp}")
 
     return render_template("verify_device.html", message="Thiết bị mới! Vui lòng nhập OTP để xác minh.")
@@ -360,9 +458,6 @@ def forgot_password():
 
     flash("Link đặt lại mật khẩu đã được gửi qua email!", "success")
     return redirect("/login")
-import re
-
-
 
 @app.route("/reset-password/<token>", methods=["GET", "POST"])
 def reset_password(token):
@@ -409,7 +504,6 @@ def reset_password(token):
     flash("Đặt lại mật khẩu thành công! Hãy đăng nhập.", "success")
     return redirect("/login")
 
-
 @app.route("/account")
 def account():
     if not is_logged_in():
@@ -419,6 +513,55 @@ def account():
     user = db.execute("SELECT * FROM users WHERE id=?", (session["user_id"],)).fetchone()
 
     return render_template("account.html", user=user)
+
+@app.route("/change-password", methods=["GET", "POST"])
+def change_password():
+    if "user_id" not in session:
+        flash("Bạn cần đăng nhập trước!", "error")
+        return redirect("/login")
+
+    if request.method == "GET":
+        return render_template("change_password.html")
+
+    old_pw = request.form.get("old_password")
+    new_pw = request.form.get("new_password")
+    confirm_pw = request.form.get("confirm_password")
+
+    # Lấy dữ liệu user từ DB
+    db = get_db()
+    user = db.execute("SELECT * FROM users WHERE id = ?", (session["user_id"],)).fetchone()
+
+    # Kiểm tra mật khẩu cũ đúng
+    if not check_password_hash(user["password"], old_pw):
+        flash("Mật khẩu cũ không chính xác!", "error")
+        return redirect("/change-password")
+
+    # Kiểm tra mật khẩu mới trùng xác nhận
+    if new_pw != confirm_pw:
+        flash("Xác nhận mật khẩu không khớp!", "error")
+        return redirect("/change-password")
+
+    # KIỂM TRA MẬT KHẨU MẠNH (chỉ cần 7 ký tự)
+    def is_strong(p):
+        return (
+            len(p) >= 7
+            and re.search(r"[A-Z]", p)
+            and re.search(r"[a-z]", p)
+            and re.search(r"[0-9]", p)
+            and re.search(r"[!@#$%^&*(),.?\":{}|<>]", p)
+        )
+
+    if not is_strong(new_pw):
+        flash("Mật khẩu phải ≥ 7 ký tự và bao gồm: chữ hoa, chữ thường, số, ký tự đặc biệt!", "error")
+        return redirect("/change-password")
+
+    # Lưu mật khẩu mới
+    hashed = generate_password_hash(new_pw)
+    db.execute("UPDATE users SET password = ? WHERE id = ?", (hashed, session["user_id"]))
+    db.commit()
+
+    flash("Đổi mật khẩu thành công!", "success")
+    return redirect("/account")
 
 # =========================================================
 # GOOGLE LOGIN
@@ -485,7 +628,6 @@ def auth_google_callback():
     flash("Thiết bị mới! Vui lòng nhập OTP để xác minh.", "info")
     return render_template("verify_device.html")
 
-
 # =========================================================
 # VERIFY DEVICE
 # =========================================================
@@ -529,7 +671,6 @@ def verify_device():
 
     return resp
 
-
 # =========================================================
 # RESEND OTP
 # =========================================================
@@ -555,58 +696,6 @@ def resend_otp():
     flash("OTP mới đã gửi!", "success")
     return render_template("verify_device.html")
 
-@app.route("/change-password", methods=["GET", "POST"])
-def change_password():
-    if "user_id" not in session:
-        flash("Bạn cần đăng nhập trước!", "error")
-        return redirect("/login")
-
-    if request.method == "GET":
-        return render_template("change_password.html")
-
-    old_pw = request.form.get("old_password")
-    new_pw = request.form.get("new_password")
-    confirm_pw = request.form.get("confirm_password")
-
-    # Lấy dữ liệu user từ DB
-    db = get_db()
-    user = db.execute("SELECT * FROM users WHERE id = ?", (session["user_id"],)).fetchone()
-
-    # Kiểm tra mật khẩu cũ đúng
-    if not check_password_hash(user["password"], old_pw):
-        flash("Mật khẩu cũ không chính xác!", "error")
-        return redirect("/change-password")
-
-    # Kiểm tra mật khẩu mới trùng xác nhận
-    if new_pw != confirm_pw:
-        flash("Xác nhận mật khẩu không khớp!", "error")
-        return redirect("/change-password")
-
-    # *********************
-    # KIỂM TRA MẬT KHẨU MẠNH (chỉ cần 7 ký tự)
-    # *********************
-    import re
-    def is_strong(p):
-        return (
-            len(p) >= 7
-            and re.search(r"[A-Z]", p)
-            and re.search(r"[a-z]", p)
-            and re.search(r"[0-9]", p)
-            and re.search(r"[!@#$%^&*(),.?\":{}|<>]", p)
-        )
-
-    if not is_strong(new_pw):
-        flash("Mật khẩu phải ≥ 7 ký tự và bao gồm: chữ hoa, chữ thường, số, ký tự đặc biệt!", "error")
-        return redirect("/change-password")
-
-    # Lưu mật khẩu mới
-    hashed = generate_password_hash(new_pw)
-    db.execute("UPDATE users SET password = ? WHERE id = ?", (hashed, session["user_id"]))
-    db.commit()
-
-    flash("Đổi mật khẩu thành công!", "success")
-    return redirect("/account")
-
 # =========================================================
 # LOGOUT
 # =========================================================
@@ -615,18 +704,18 @@ def logout():
     session.clear()
     return redirect(url_for("login"))
 
-
 # =========================================================
-# VIDEO UPLOAD
+# VIDEO UPLOAD AND ANALYSIS
 # =========================================================
 @app.route("/upload", methods=["POST"])
 def upload_video():
-
     global history, temp_storage
     
-    if "video" not in request.files: return jsonify({"error": "No file uploaded"}), 400
+    if "video" not in request.files: 
+        return jsonify({"error": "No file uploaded"}), 400
     video_file = request.files["video"]
-    if video_file.filename == "": return jsonify({"error": "Empty filename"}), 400
+    if video_file.filename == "": 
+        return jsonify({"error": "Empty filename"}), 400
     
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
     filename = video_file.filename
@@ -734,5 +823,6 @@ def clear_all_history():
 # RUN APP
 # =========================================================
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
-
+    init_db()
+    os.makedirs("examples_test_videos", exist_ok=True)
+    app.run(host="127.0.0.1", port=5000, debug=False)
