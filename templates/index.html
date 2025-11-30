@@ -26,39 +26,15 @@
             <a href="/settings" class="nav-item">{{ t.settings }}</a>
         </div>
 
-        <!-- <div class="user-profile" id="userProfileButton">
-            <img src="{{ user.icon_url }}" class="user-icon">
-
-        </div> -->
-
         <div class="nav-right">
             {% if session.get("user_id") %}
-              
                 <a href="/account" class="btn-primary">Account</a>
-
             {% else %}
                 <a href="/login" class="btn-primary">Login</a>
                 <a href="/register" class="btn-primary">Register</a>
             {% endif %}
         </div>
     </nav>
-
-    <!-- PROFILE PANEL -->
-    <div class="profile-panel" id="profilePanel">
-        <div class="profile-header">
-            <img src="{{ user.icon_url }}" class="profile-icon">
-            <div class="profile-info">
-                <span class="profile-username">{{ user.username }}</span>
-                <span class="profile-tagline">{{ user.tagline }}</span>
-            </div>
-        </div>
-
-        <div class="profile-menu-grid">
-            <div class="menu-item" onclick="window.location.href='/settings'">{{ t.settings }}</div>
-            <div class="menu-item" onclick="window.location.href='/logout'">{{ t.logout }}</div>
-        </div>
-    </div>
-
 
     <main class="container">
         <!-- HERO SECTION -->
@@ -119,16 +95,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.documentElement.setAttribute('data-theme', '{{ theme }}');
 });
 
-/* PROFILE PANEL */
-const profileBtn = document.getElementById("userProfileButton");
-const profilePanel = document.getElementById("profilePanel");
-profileBtn.addEventListener("click", () => profilePanel.classList.toggle("open"));
-document.addEventListener("click", e => {
-    if (!profilePanel.contains(e.target) && !profileBtn.contains(e.target))
-        profilePanel.classList.remove("open");
-});
-
-
 /* ELEMENTS */
 const uploadBtn = document.getElementById("uploadBtn");
 const videoInput = document.getElementById("videoInput");
@@ -149,7 +115,6 @@ const notifySaveBtn = document.getElementById("notifySaveBtn");
 const notifyDiscardBtn = document.getElementById("notifyDiscardBtn");
 const notifyMessage = document.getElementById("notifyMessage");
 
-
 let currentTempId = null;
 let currentFilename = null;
 
@@ -158,14 +123,16 @@ videoInput.addEventListener("change", () => {
     const f = videoInput.files[0];
     videoInputName.textContent = f ? f.name : "{{ t.no_file }}";
     currentFilename = f ? f.name : null;
+    console.log("File selected:", f ? {name: f.name, size: f.size, type: f.type} : "No file");
 });
 
 /* RENDER RESULT */
 function renderResults(data) {
+    console.log("Rendering results:", data);
+    
     const isFake = data.prediction === "FAKE";
     predictionBox.style.borderColor = isFake ? "var(--red-fake)" : "var(--green-real)";
     predictionBox.style.boxShadow = `0 0 15px ${isFake ? "var(--red-fake)" : "var(--green-real)"}`;
-
 
     predictionText.textContent = data.prediction;
     predictionText.className = `prediction-value ${isFake ? "fake" : "real"}`;
@@ -177,11 +144,13 @@ function renderResults(data) {
         timelineImg.src = "data:image/png;base64," + data.timeline_base64;
         timelineImg.style.display = "block";
         timelineHeader.style.display = "block";
+        console.log("Timeline image loaded");
     }
 
     /* FRAMES */
     framesGallery.innerHTML = "";
-    if (data.frames_base64) {
+    if (data.frames_base64 && data.frames_base64.length > 0) {
+        console.log(`Rendering ${data.frames_base64.length} frames`);
         data.frames_base64.forEach(f => {
             const box = document.createElement("div");
             box.className = "frame-item";
@@ -191,24 +160,57 @@ function renderResults(data) {
                 <p>Frame ${f.frame_index}</p>
                 <div class="comp-box">
                     <h4>{{ t.detected_face }}</h4>
-                    <img src="data:image/jpeg;base64,${f.face_base64}" class="face-img">
+                    <img src="data:image/jpeg;base64,${f.face_base64}" class="face-img" onerror="console.error('Failed to load face image')">
                 </div>
                 <div class="comp-box">
                     <h4>{{ t.heatmap }}</h4>
-                    <img src="data:image/jpeg;base64,${f.heatmap_base64}" class="face-img">
+                    <img src="data:image/jpeg;base64,${f.heatmap_base64}" class="face-img" onerror="console.error('Failed to load heatmap image')">
                 </div>
                 <p class="confidence-label">{{ t.confidence }}: ${(f.confidence * 100).toFixed(2)}%</p>
             `;
             framesGallery.appendChild(box);
         });
+    } else {
+        console.log("No frames to display");
     }
 }
 
-/* UPLOAD CLICK */
+/* UPLOAD CLICK - DEBUG VERSION */
 uploadBtn.addEventListener("click", async () => {
     const file = videoInput.files[0];
     if (!file) {
         alert("Please select a video.");
+        return;
+    }
+
+    console.log("=== UPLOAD DEBUG START ===");
+    console.log("Selected file:", {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified
+    });
+
+    // Kiểm tra định dạng file
+    const allowedExtensions = ['mp4', 'avi', 'mov', 'mkv', 'webm'];
+    const fileExtension = file.name.split('.').pop().toLowerCase();
+    
+    console.log("File extension:", fileExtension);
+    
+    if (!allowedExtensions.includes(fileExtension)) {
+        alert(`Invalid file format: .${fileExtension}. Supported: ${allowedExtensions.join(', ')}`);
+        return;
+    }
+
+    // Kiểm tra kích thước file (tối đa 100MB)
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    if (file.size > maxSize) {
+        alert("File too large. Maximum size is 100MB.");
+        return;
+    }
+
+    if (file.size === 0) {
+        alert("File is empty. Please select a valid video file.");
         return;
     }
 
@@ -219,17 +221,45 @@ uploadBtn.addEventListener("click", async () => {
     form.append("video", file);
 
     try {
-        const res = await fetch("/upload", { method: "POST", body: form });
+        console.log("Starting upload...");
+        
+        // Tạo timeout controller
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+            console.log("Upload timeout after 5 minutes");
+            controller.abort();
+        }, 300000); // 5 phút
+        
+        const startTime = Date.now();
+        const res = await fetch("/upload", { 
+            method: "POST", 
+            body: form,
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        const endTime = Date.now();
+        console.log(`Upload request completed in ${endTime - startTime}ms`);
+        console.log("Upload response status:", res.status);
+        console.log("Upload response headers:", Object.fromEntries(res.headers.entries()));
+        
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
         const data = await res.json();
+        console.log("Upload response data:", data);
 
         uploadSpinner.style.display = "none";
         uploadBtn.disabled = false;
 
         if (data.error) {
-            alert(data.error);
+            console.error("Upload failed with error:", data.error);
+            alert("Upload failed: " + data.error);
             return;
         }
 
+        console.log("Upload successful, rendering results...");
         resultSection.style.display = "block";
         renderResults(data);
 
@@ -237,17 +267,30 @@ uploadBtn.addEventListener("click", async () => {
         notifyFilename.textContent = currentFilename;
         saveHistoryNotification.style.display = "flex";
 
+        console.log("=== UPLOAD DEBUG END - SUCCESS ===");
+
     } catch (e) {
-        console.error("Upload error:", e);
-        alert("Upload failed.");
+        console.error("Upload error details:", e);
         uploadSpinner.style.display = "none";
         uploadBtn.disabled = false;
+        
+        if (e.name === 'AbortError') {
+            alert("Upload timeout. Please try again with a smaller file or check your internet connection.");
+        } else if (e.name === 'TypeError' && e.message.includes('fetch')) {
+            alert("Network error. Please check your internet connection and try again.");
+        } else {
+            alert("Upload failed: " + e.message);
+        }
+        
+        console.log("=== UPLOAD DEBUG END - ERROR ===");
     }
 });
 
 /* SAVE/DISCARD HISTORY */
 async function handleSaveHistory(save) {
     if(!currentTempId) return;
+    console.log(`Saving history: ${save ? 'SAVE' : 'DISCARD'}, temp_id: ${currentTempId}`);
+    
     notifyMessage.textContent = "Processing...";
     try {
         const res = await fetch("/save_history", {
@@ -255,7 +298,11 @@ async function handleSaveHistory(save) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ temp_id: currentTempId, save })
         });
+        
+        console.log("Save history response status:", res.status);
         const data = await res.json();
+        console.log("Save history response:", data);
+        
         notifyMessage.textContent = data.message;
         setTimeout(() => {
             saveHistoryNotification.style.display = "none";
@@ -263,7 +310,7 @@ async function handleSaveHistory(save) {
             notifyMessage.textContent = "";
         }, 1500);
     } catch(e) {
-        console.error(e);
+        console.error("Save history error:", e);
         notifyMessage.textContent = "Failed to save history.";
         setTimeout(() => {
             saveHistoryNotification.style.display = "none";
@@ -276,12 +323,16 @@ async function handleSaveHistory(save) {
 notifySaveBtn.addEventListener("click", () => handleSaveHistory(true));
 notifyDiscardBtn.addEventListener("click", () => handleSaveHistory(false));
 
-document.addEventListener('DOMContentLoaded', function() {
-    const currentTheme = '{{ theme }}';
-    document.documentElement.setAttribute('data-theme', currentTheme);
-    console.log('Theme applied:', currentTheme); // Debug log
+// Thêm event listener để theo dõi network errors
+window.addEventListener('unhandledrejection', event => {
+    console.error('Unhandled promise rejection:', event.reason);
 });
+
+window.addEventListener('error', event => {
+    console.error('Global error:', event.error);
+});
+
+console.log("JavaScript loaded successfully");
 </script>
 </body>
 </html>
-

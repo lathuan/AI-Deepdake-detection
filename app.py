@@ -711,28 +711,74 @@ def logout():
 def upload_video():
     global history, temp_storage
     
+    print("=== UPLOAD DEBUG START ===")
+    print("Request files:", dict(request.files))
+    
     if "video" not in request.files: 
+        print("ERROR: No video file in request")
         return jsonify({"error": "No file uploaded"}), 400
+    
     video_file = request.files["video"]
+    print("Video file object:", video_file)
+    print("Video filename:", video_file.filename)
+    print("Video content type:", video_file.content_type)
+    print("Video content length:", video_file.content_length)
+    
     if video_file.filename == "": 
+        print("ERROR: Empty filename")
         return jsonify({"error": "Empty filename"}), 400
+    
+    # Kiểm tra định dạng file
+    allowed_extensions = {'mp4', 'avi', 'mov', 'mkv', 'webm'}
+    file_extension = video_file.filename.rsplit('.', 1)[1].lower() if '.' in video_file.filename else ''
+    
+    print("File extension:", file_extension)
+    
+    if file_extension not in allowed_extensions:
+        print(f"ERROR: Invalid file format: {file_extension}")
+        return jsonify({"error": f"Invalid file format. Supported: {', '.join(allowed_extensions)}"}), 400
     
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
     filename = video_file.filename
     save_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{timestamp}_{video_file.filename}")
 
+    print("Save path:", save_path)
+    print("Upload folder exists:", os.path.exists(app.config["UPLOAD_FOLDER"]))
+    print("Upload folder path:", os.path.abspath(app.config["UPLOAD_FOLDER"]))
+
     try:
         video_file.save(save_path)
+        print("File saved successfully")
+        
+        # Kiểm tra file tồn tại và có kích thước
+        if os.path.exists(save_path):
+            file_size = os.path.getsize(save_path)
+            print(f"File size: {file_size} bytes")
+            
+            if file_size == 0:
+                print("ERROR: File is empty")
+                return jsonify({"error": "Uploaded file is empty"}), 400
+        else:
+            print("ERROR: File not saved properly")
+            return jsonify({"error": "Failed to save uploaded video"}), 500
+
     except Exception as e:
+        print(f"ERROR saving file: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": f"Failed to save uploaded video: {str(e)}"}), 500
 
     try:
+        print("Starting deepfake prediction...")
         result = predict_deepfake(save_path)
+        print("Prediction result:", result)
 
         if result.get("error"):
+            print("Prediction error:", result["error"])
             session.pop('last_result', None) 
             return jsonify({"error": result["error"]}), 500
 
+        # Xử lý frames
         frames_web = []
         for frame in result.get("frames_for_web", []):
             face_b64 = pil_image_to_base64(frame.get("face_image")) 
@@ -766,19 +812,25 @@ def upload_video():
         temp_storage[temp_id] = temp_entry
         response_data["temp_id"] = temp_id 
 
+        print("Upload completed successfully")
         return jsonify(response_data)
 
     except Exception as e:
         session.pop('last_result', None)
-        print(f"Prediction failed due to error: {e}") 
+        print(f"Prediction failed due to error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
     finally:
         try:
             if os.path.exists(save_path):
                 os.remove(save_path)
+                print("Temporary file cleaned up")
         except Exception as e:
             print(f"Warning: Failed to delete uploaded video {save_path}: {e}")
+    
+    print("=== UPLOAD DEBUG END ===")
 
 @app.route("/save_history", methods=["POST"])
 def save_history():
