@@ -28,6 +28,18 @@
 
         <div class="user-profile" id="userProfileButton">
             <img src="{{ user.icon_url }}" class="user-icon">
+
+        </div>
+
+        <div class="nav-right">
+            {% if session.get("user_id") %}
+              
+                <a href="/account">Account</a>
+                <a href="/logout" class="btn-logout">Logout</a>
+            {% else %}
+                <a href="/login">Login</a>
+                <a href="/register" class="btn-primary">Register</a>
+            {% endif %}
         </div>
     </nav>
 
@@ -46,6 +58,7 @@
             <div class="menu-item" onclick="window.location.href='/logout'">{{ t.logout }}</div>
         </div>
     </div>
+
 
     <main class="container">
         <!-- HERO SECTION -->
@@ -115,6 +128,7 @@ document.addEventListener("click", e => {
         profilePanel.classList.remove("open");
 });
 
+
 /* ELEMENTS */
 const uploadBtn = document.getElementById("uploadBtn");
 const videoInput = document.getElementById("videoInput");
@@ -135,6 +149,7 @@ const notifySaveBtn = document.getElementById("notifySaveBtn");
 const notifyDiscardBtn = document.getElementById("notifyDiscardBtn");
 const notifyMessage = document.getElementById("notifyMessage");
 
+
 let currentTempId = null;
 let currentFilename = null;
 
@@ -150,6 +165,7 @@ function renderResults(data) {
     const isFake = data.prediction === "FAKE";
     predictionBox.style.borderColor = isFake ? "var(--red-fake)" : "var(--green-real)";
     predictionBox.style.boxShadow = `0 0 15px ${isFake ? "var(--red-fake)" : "var(--green-real)"}`;
+
 
     predictionText.textContent = data.prediction;
     predictionText.className = `prediction-value ${isFake ? "fake" : "real"}`;
@@ -268,3 +284,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 </body>
 </html>
+

@@ -1,17 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login</title>
     <link rel="stylesheet" href="/static/style.css">
+
+    <!-- GOOGLE reCAPTCHA SCRIPT -->
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 </head>
+
 <body>
 
     <nav class="navbar">
         <div class="nav-left">
             <a class="nav-logo" href="/">DeepfakeDetect</a>
         </div>
+
         <div class="nav-right">
             <a href="/login">Login</a>
             <a href="/register" class="btn-primary">Register</a>
@@ -20,21 +26,58 @@
 
     <main class="container">
         <div class="auth-box">
+
             <h2>Login</h2>
 
+            <!-- FLASH MESSAGES -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                <div class="alert {{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+
             <form method="POST" action="/login">
+
                 <label>Email</label>
                 <input type="email" name="email" required>
 
                 <label>Password</label>
                 <input type="password" name="password" required>
 
-                <button type="submit" class="btn-primary">Login</button>
-            </form>
+                <!-- reCAPTCHA -->
+                <div class="captcha-wrapper">
+                    <div class="g-recaptcha" data-sitekey="6LfPWBYsAAAAADWfym05B1aklwFeW_KLYB2u_54-"></div>
+                </div>
 
+                <button type="submit" class="btn-primary btn-full">
+                    Login
+                </button>
+
+                <!-- OAUTH GOOGLE -->
+                <div class="oauth-box">
+                    <div class="divider">
+                        <span>Or login with</span>
+                    </div>
+
+                    <a href="/auth/google" class="btn-google">
+                        <img src="https://developers.google.com/identity/images/g-logo.png" alt="">
+                        Continue with Google
+                    </a>
+                </div>
+
+            </form>
+            
+
+            <p><a href="/forgot-password">Forgot Password?</a></p>
             <p>Don't have an account? <a href="/register">Register</a></p>
+
         </div>
     </main>
 
 </body>
+
 </html>

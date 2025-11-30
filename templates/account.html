@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-left">
+            <a class="nav-logo" href="/">DeepfakeDetect</a>
+        </div>
+
+        <div class="nav-right">
+            <!-- SỬA: /Dashboard → / -->
+            <a href="/" class="btn-dashboard">Dashboard</a>
+
+            <a href="/logout" class="btn-logout">Logout</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <h2>Thông tin tài khoản</h2>
+
+        <div class="auth-box">
+            <p><strong>Tên:</strong> {{ user.username }}</p>
+            <p><strong>Email:</strong> {{ user.email }}</p>
+
+            <a href="/change-password">
+                <button class="btn-primary">Đổi mật khẩu</button>
+            </a>
+        </div>
+    </main>
+
+</body>
+</html>
