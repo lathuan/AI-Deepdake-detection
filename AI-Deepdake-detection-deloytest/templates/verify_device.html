@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Device</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <nav class="navbar">
+        <div class="nav-left">
+            <a class="nav-logo" href="/">DeepfakeDetect</a>
+        </div>
+
+        <div class="nav-right">
+            <a href="/login">Login</a>
+            <a href="/register" class="btn-primary">Register</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="auth-box">
+            <h2>Verify New Device</h2>
+
+            <p>
+                We detected a new device or browser.
+                Please enter the OTP code sent to your email to continue.
+            </p>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}" style="color:red; font-weight:bold;">
+                {{ message }}
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% endwith %}
+
+
+            <form method="POST" action="/verify-device">
+                <label>OTP Code</label>
+                <input type="text" name="otp" maxlength="6" required placeholder="Enter 6-digit code">
+
+                <button type="submit" class="btn-primary" style="margin-top: 15px;">
+                    Verify Device
+                </button>
+            </form>
+
+            <p style="margin-top: 10px;">
+                Didn’t receive the code?
+                <a href="/resend-otp">Resend OTP</a>
+            </p>
+        </div>
+    </main>
+
+</body>
+
+</html>

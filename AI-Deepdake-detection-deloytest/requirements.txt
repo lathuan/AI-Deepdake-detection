@@ -1,0 +1,20 @@
+# Web server
+flask
+gunicorn
+
+# PyTorch CPU tương thích với Python 3.13
+torch==2.6.0+cpu
+torchvision==0.21.0+cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# Thư viện khoa học dữ liệu & xử lý ảnh
+numpy
+matplotlib
+pillow
+opencv-python
+
+# AI / YOLO
+ultralytics
+
+# PostgreSQL
+psycopg2-binary

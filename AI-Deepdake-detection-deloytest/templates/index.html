@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Deepfake Detection</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <!-- NAVBAR -->
+    <nav class="navbar">
+        <div class="nav-left">
+            <a href="/" class="nav-logo">DeepfakeDetect</a>
+        </div>
+
+        <div class="nav-right">
+            {% if session.get("user_id") %}
+              
+                <a href="/account">Account</a>
+                <a href="/logout" class="btn-logout">Logout</a>
+            {% else %}
+                <a href="/login">Login</a>
+                <a href="/register" class="btn-primary">Register</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="container">
+        <h1>AI Deepfake Detection</h1>
+        <p>Upload video và nhận phân tích chi tiết từ AI</p>
+
+        <input type="file" id="videoInput" accept="video/*">
+        <button id="uploadBtn">Detect Deepfake</button>
+
+        <div id="result" class="result"></div>
+    </main>
+
+    <script>
+        const btn = document.getElementById("uploadBtn");
+        const input = document.getElementById("videoInput");
+        const resultDiv = document.getElementById("result");
+
+        btn.addEventListener("click", async () => {
+            if (!input.files[0]) { 
+                alert("Chọn video trước!"); 
+                return; 
+            }
+
+            const formData = new FormData();
+            formData.append("video", input.files[0]);
+
+            resultDiv.innerHTML = "<p>🔄 Processing video...</p>";
+
+            const resp = await fetch("/upload", { method: "POST", body: formData });
+            const data = await resp.json();
+
+            if (data.error) {
+                resultDiv.innerHTML = `<p>❌ ${data.error}</p>`;
+                return;
+            }
+
+            let html = `<h2>Prediction: ${data.prediction}</h2>`;
+            html += `<p>Confidence: ${(data.confidence * 100).toFixed(1)}%</p>`;
+            html += `<p>Probability FAKE: ${data.probability.toFixed(3)}</p>`;
+            html += `<p>Number of faces detected: ${data.num_faces}</p>`;
+
+            if (data.frames_base64.length > 0) {
+                html += "<h3>Frames Nghi Ngờ:</h3>";
+                data.frames_base64.forEach(frame => {
+                    html += `<div style="display:inline-block; margin:10px; text-align:center;">
+                                <img src="data:image/png;base64,${frame.face_base64}" class="face-img"><br>
+                                Conf: ${(frame.confidence * 100).toFixed(1)}%<br>`;
+                    if (frame.heatmap_base64) {
+                        html += `<img src="data:image/png;base64,${frame.heatmap_base64}" class="timeline-img">`;
+                    }
+                    html += "</div>";
+                });
+            }
+
+            if (data.timeline_base64) {
+                html += "<h3>Confidence Timeline:</h3>";
+                html += `<img src="data:image/png;base64,${data.timeline_base64}" class="timeline-img">`;
+            }
+
+            resultDiv.innerHTML = html;
+        });
+    </script>
+
+</body>
+</html>

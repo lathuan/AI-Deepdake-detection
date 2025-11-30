@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <div class="nav-right">
+    {% if session.get("user_id") %}
+        <a href="/dashboard">Dashboard</a>
+        <a href="/account">Account</a>
+        <a href="/logout" class="btn-logout">Logout</a>
+    {% else %}
+        <a href="/login">Login</a>
+        <a href="/register" class="btn-primary">Register</a>
+    {% endif %}
+</div>
+
+
+    <main class="container">
+        <h2>Welcome!</h2>
+
+        <div class="upload-box">
+            <h3>Upload a video to detect deepfake</h3>
+
+            <form method="POST" action="/dashboard" enctype="multipart/form-data">
+                <input type="file" name="video" accept="video/*" required>
+                <button class="btn-primary" type="submit">Analyze Video</button>
+            </form>
+        </div>
+
+        <div id="result"></div>
+    </main>
+
+</body>
+</html>
