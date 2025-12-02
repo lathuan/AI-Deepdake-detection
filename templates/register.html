@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register - Deepfake Detection</title>
-    <link rel="stylesheet" href="../static/style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://www.google.com/recaptcha/api.js?hl=vi&render=explicit" async defer></script>
 </head>
 <body>
     <!-- Background Elements -->
@@ -35,7 +36,7 @@
             <div class="flash-modern flash-error" id="errorBox" style="display: none;"></div>
 
             <!-- Register Form -->
-            <form method="POST" action="/register" id="registerForm">
+            <form method="POST" action="{{ url_for('register') }}" id="registerForm">
                 <!-- Name -->
                 <div class="form-group">
                     <label class="form-label">Full Name</label>
@@ -66,10 +67,15 @@
                     </div>
                 </div>
 
+                <!-- reCAPTCHA Container -->
+                <div class="form-group">
+                    <label class="form-label">Xác Nhận Bạn Không Phải Robot</label>
+                    <div id="recaptcha-container" class="recaptcha-modern"></div>
+                    <input type="hidden" name="g-recaptcha-response" id="recaptcha-response">
+                </div>
+
                 <!-- Submit Button -->
-                <button type="submit" class="btn-submit" id="registerBtn">
-                    Create Account
-                </button>
+                <button type="submit" class="btn-submit" id="registerBtn" disabled>Create Account</button>
             </form>
 
             <!-- Divider -->
@@ -78,7 +84,7 @@
             </div>
 
             <!-- OAuth -->
-            <a href="/auth/google" class="btn-oauth">
+            <a href="{{ url_for('auth_google') }}" class="btn-oauth">
                 <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google">
                 Continue with Google
             </a>
@@ -86,12 +92,54 @@
             <!-- Links -->
             <div class="auth-links">
                 <span style="color: var(--text-subtle);">Already have an account? </span>
-                <a href="/login" class="auth-link">Sign in</a>
+                <a href="{{ url_for('login') }}" class="auth-link">Sign in</a>
             </div>
         </div>
     </div>
 
     <script>
+        let recaptchaWidgetId;
+
+        // Render reCAPTCHA
+        function renderRecaptcha() {
+            recaptchaWidgetId = grecaptcha.render('recaptcha-container', {
+                'sitekey': '6LeYwB4sAAAAAMrpysbdv5AKVcJ2R6ZZxprwlho-',
+                'theme': 'dark',
+                'callback': onRecaptchaSuccess,
+                'expired-callback': onRecaptchaExpired
+            });
+        }
+
+        function onRecaptchaSuccess(token) {
+            document.getElementById('recaptcha-response').value = token;
+            checkFormReady();  // Kiểm tra xem form có ready không
+        }
+
+        function onRecaptchaExpired() {
+            document.getElementById('recaptcha-response').value = '';
+            document.getElementById('registerBtn').disabled = true;
+            document.getElementById('registerBtn').classList.remove('btn-ready');
+            grecaptcha.reset(recaptchaWidgetId);
+        }
+
+        // Kiểm tra form ready (password strong + CAPTCHA OK)
+        function checkFormReady() {
+            const password = document.getElementById('password').value;
+            const response = document.getElementById('recaptcha-response').value;
+            const btn = document.getElementById('registerBtn');
+            
+            const isPasswordStrong = password.length >= 8 && /[A-Z]/.test(password) && /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+            const isCaptchaOk = !!response;
+            
+            if (isPasswordStrong && isCaptchaOk) {
+                btn.disabled = false;
+                btn.classList.add('btn-ready');
+            } else {
+                btn.disabled = true;
+                btn.classList.remove('btn-ready');
+            }
+        }
+
         // Password strength indicator
         const passwordInput = document.getElementById('password');
         const strengthBar = document.getElementById('strengthBar');
@@ -139,11 +187,15 @@
             } else if (strength === 3) {
                 strengthBar.classList.add('strength-strong');
             }
+
+            // Kiểm tra form ready sau khi thay đổi password
+            checkFormReady();
         });
 
         // Form validation
         document.getElementById('registerForm').addEventListener('submit', function(e) {
             const password = passwordInput.value;
+            const response = document.getElementById('recaptcha-response').value;
             let errors = [];
             
             if (password.length < 8) {
@@ -155,6 +207,9 @@
             if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
                 errors.push("Password must contain at least one special character");
             }
+            if (!response) {
+                errors.push("Please complete the CAPTCHA verification");
+            }
             
             if (errors.length > 0) {
                 e.preventDefault();
@@ -163,6 +218,7 @@
                 
                 // Scroll to error
                 errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return false;
             } else {
                 // Show loading state
                 const btn = document.getElementById('registerBtn');
@@ -170,6 +226,15 @@
                 btn.innerHTML = 'Creating Account...';
             }
         });
+
+        // Load recaptcha
+        window.onload = function() {
+            if (typeof grecaptcha !== 'undefined') {
+                renderRecaptcha();
+            } else {
+                setTimeout(renderRecaptcha, 1000);
+            }
+        };
 
         // Input focus effects
         const inputs = document.querySelectorAll('.form-input');

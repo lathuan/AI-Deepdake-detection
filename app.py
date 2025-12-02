@@ -338,6 +338,28 @@ def register():
     if request.method == "GET":
         return render_template("register.html")
 
+    # === KIỂM TRA reCAPTCHA ===
+    recaptcha_response = request.form.get("g-recaptcha-response")
+
+    if not recaptcha_response:
+        flash("Vui lòng xác nhận reCAPTCHA!", "error")
+        return redirect(url_for("register"))
+
+    verify_url = "https://www.google.com/recaptcha/api/siteverify"
+    data = {
+        "secret": RECAPTCHA_SECRET,
+        "response": recaptcha_response,
+        "remoteip": request.remote_addr
+    }
+
+    recaptcha_verify = requests.post(verify_url, data=data).json()
+
+    if not recaptcha_verify.get("success"):
+        flash("reCAPTCHA không hợp lệ!", "error")
+        return redirect(url_for("register"))
+
+    # === REGISTER SAU KHI PASS CAPTCHA ===
+
     name = request.form.get("name")
     email = request.form.get("email")
     password = request.form.get("password")
