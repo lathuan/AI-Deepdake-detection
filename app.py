@@ -30,7 +30,7 @@ app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = "2a2fd639618205a5bbbc40f0b64f64d8b8e61c417ea9e7bde08360a15ad8c9ef"
 
 # reCAPTCHA Secret
-RECAPTCHA_SECRET = "6LeYwB4sAAAAAJSGJO-BDvTyP0fWK-agoigCytwm"  # Key mới
+RECAPTCHA_SECRET = "6LdZ9B8sAAAAAMk8Cg-9NYrS2qi_SVH4SnkUPiMq"  # Key mới
 
 # Gmail settings
 EMAIL_ADDRESS = "webdeepfake@gmail.com"

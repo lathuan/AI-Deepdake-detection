@@ -57,6 +57,18 @@
                 <button type="submit" class="btn-submit" id="loginBtn" disabled>Đăng Nhập</button>
             </form>
 
+            <!-- QR Code Section -->
+            <div class="qr-section">
+                <div class="qr-header">
+                    <h3>Hoặc quét QR để đăng nhập qua Google</h3>
+                    <p>Quét bằng camera điện thoại để đăng nhập nhanh</p>
+                </div>
+                <div id="qr-container" class="qr-container">
+                    <img id="qr-image" src="" alt="QR Code Login" style="display: none;">
+                    <p id="qr-loading">Đang tải QR code...</p>
+                </div>
+            </div>
+
             <!-- Divider -->
             <div class="auth-divider">
                 <span>Hoặc tiếp tục với</span>
@@ -70,10 +82,8 @@
 
             <!-- Links -->
             <div class="auth-links">
-                <a href="{{ url_for('forgot_password') }}" class="auth-link">Quên mật khẩu?</a>
-                <br>
-                <span style="color: var(--text-subtle);">Chưa có tài khoản? </span>
-                <a href="{{ url_for('register') }}" class="auth-link">Tạo tài khoản</a>
+                <a href="{{ url_for('register') }}" class="auth-link">Đăng Ký</a>
+                <a href="{{ url_for('forgot_password') }}" class="auth-link">Quên Mật Khẩu?</a>
             </div>
         </div>
     </div>
@@ -84,7 +94,7 @@
         // Render reCAPTCHA
         function renderRecaptcha() {
             recaptchaWidgetId = grecaptcha.render('recaptcha-container', {
-                'sitekey': '6LeYwB4sAAAAAMrpysbdv5AKVcJ2R6ZZxprwlho-',  // Site key mới
+                'sitekey': '6LdZ9B8sAAAAAJNngdrks1DlcNbwur7y73sk-p0_',
                 'theme': 'dark',
                 'callback': onRecaptchaSuccess,
                 'expired-callback': onRecaptchaExpired
@@ -117,6 +127,19 @@
             btn.classList.add('btn-loading');
             btn.innerHTML = 'Đang Đăng Nhập...';
         });
+
+        // Load QR Code
+        fetch('/qr-login')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('qr-image').src = data.qr_url;
+                document.getElementById('qr-image').style.display = 'block';
+                document.getElementById('qr-loading').style.display = 'none';
+            })
+            .catch(error => {
+                console.error('Lỗi tải QR:', error);
+                document.getElementById('qr-loading').innerHTML = 'Lỗi tải QR code';
+            });
 
         // Load recaptcha
         window.onload = function() {
