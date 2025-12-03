@@ -2207,6 +2207,7 @@ input:checked + .slider:before {
     z-index: -1;
 }
 
+
 /* Additional Utilities */
 .text-center {
     text-align: center;
@@ -2461,6 +2462,51 @@ input:valid {
     .verify-container {
         padding: 90px 15px 30px;
     }
+
+/* reCAPTCHA Challenge Enhancements */
+#recaptcha-container {
+    min-height: 78px; /* Chiều cao chuẩn cho checkbox */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.recaptcha-modern iframe {
+    border-radius: 4px; /* Bo góc nhẹ cho widget */
+}
+
+/* Style cho popup challenge (Google render, nhưng container glow) */
+.g-recaptcha-challenge {
+    box-shadow: var(--shadow-primary) !important; /* Áp dụng shadow theme */
+    border-radius: 12px !important;
+}
+
+/* Responsive cho reCAPTCHA trên mobile */
+@media (max-width: 768px) {
+    .recaptcha-modern {
+        transform: scale(0.85); /* Scale nhỏ hơn trên mobile để vừa màn hình */
+        transform-origin: center;
+    }
+    
+    .g-recaptcha-challenge {
+        transform: scale(0.9) !important;
+        transform-origin: top center !important;
+    }
+}
+
+/* --- RESPONSIVE DESIGN --- */
+@media (max-width: 900px){.container{width:95%;}.hero-section h1{font-size:36px;}}
+@media (max-width: 768px){
+    nav.header{padding:15px 20px;}.nav-links{display:none;}.logo h1{font-size:20px;}
+    .profile-panel{top:60px;right:10px;width:280px;}
+    .input-controls{flex-direction:column;gap:15px;align-items:stretch;}
+    .input-controls label,#uploadBtn{width:100%;text-align:center;justify-content:center;}
+    #videoInputName{width:auto;}
+    .detail-grid{grid-template-columns:1fr;gap:15px;}
+    .frame-gallery{grid-template-columns:1fr;gap:20px;}
+    .frame-item{width:95%;max-width:none;margin:0 auto;}
+    .prediction-value{font-size:40px;}
+
     
     .verify-card {
         padding: 30px 25px;
@@ -2748,4 +2794,5 @@ input:valid {
     .form-hint {
         font-size: 11px;
     }
+}
 }
