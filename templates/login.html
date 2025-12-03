@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Deepfake Detection</title>
     <link rel="stylesheet" href="../static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 </head>
 <body>
@@ -12,6 +13,23 @@
     <div class="bg-glow main-glow"></div>
     <div class="bg-glow top-right-glow"></div>
     <div class="bg-glow bottom-left-glow"></div>
+    
+    <!-- Top Navigation Bar -->
+    <nav class="auth-navbar">
+        <div class="auth-navbar-container">
+            <a href="/" class="auth-navbar-brand">
+                <i class="fas fa-home"></i> Deepfake Detection
+            </a>
+            <div class="auth-navbar-links">
+                <a href="/" class="auth-navbar-link">
+                    <i class="fas fa-home"></i> Home
+                </a>
+                <a href="/register" class="auth-navbar-link">
+                    <i class="fas fa-user-plus"></i> Register
+                </a>
+            </div>
+        </div>
+    </nav>
 
     <div class="auth-container">
         <div class="auth-card">
@@ -53,7 +71,7 @@
 
                 <!-- Submit Button -->
                 <button type="submit" class="btn-submit" id="loginBtn">
-                    Sign In
+                    <i class="fas fa-sign-in-alt"></i> Sign In
                 </button>
             </form>
 
@@ -70,20 +88,26 @@
 
             <!-- Links -->
             <div class="auth-links">
-                <a href="/forgot-password" class="auth-link">Forgot your password?</a>
+                <a href="/forgot-password" class="auth-link">
+                    <i class="fas fa-key"></i> Forgot your password?
+                </a>
                 <br>
                 <span style="color: var(--text-subtle);">Don't have an account? </span>
-                <a href="/register" class="auth-link">Create account</a>
+                <a href="/register" class="auth-link">
+                    <i class="fas fa-user-plus"></i> Create account
+                </a>
             </div>
         </div>
     </div>
+
+
 
     <script>
         // Form loading state
         document.getElementById('loginForm').addEventListener('submit', function() {
             const btn = document.getElementById('loginBtn');
             btn.classList.add('btn-loading');
-            btn.innerHTML = 'Signing In...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
         });
 
         // Add input focus effects
@@ -96,6 +120,10 @@
                 this.parentElement.classList.remove('focused');
             });
         });
+        
+        // Theme detection
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', currentTheme);
     </script>
 </body>
 </html>

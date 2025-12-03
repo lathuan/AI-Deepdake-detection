@@ -1,62 +1,182 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verify Device</title>
-    <link rel="stylesheet" href="../static/style.css">
+    <title>Settings - DeepfakeDetect</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-
 <body>
+    <!-- Background Elements -->
+    <div class="bg-glow main-glow"></div>
+    <div class="bg-glow top-right-glow"></div>
+    <div class="bg-glow bottom-left-glow"></div>
 
-    <nav class="navbar">
-        <div class="nav-left">
-            <a class="nav-logo" href="/">DeepfakeDetect</a>
-        </div>
-
-        <div class="nav-right">
-            <a href="/login">Login</a>
-            <a href="/register" class="btn-primary">Register</a>
+    <!-- Navigation -->
+    <nav class="auth-navbar">
+        <div class="auth-navbar-container">
+            <a href="/" class="auth-navbar-brand">
+                <i class="fas fa-shield-alt"></i> Deepfake Detection
+            </a>
+            <div class="auth-navbar-links">
+                <a href="/" class="auth-navbar-link">
+                    <i class="fas fa-home"></i> Home
+                </a>
+                <a href="/login" class="auth-navbar-link">
+                    <i class="fas fa-sign-in-alt"></i> Login
+                </a>
+            </div>
         </div>
     </nav>
 
-    <main class="container">
-        <div class="auth-box">
-            <h2>Verify New Device</h2>
-
-            <p>
-                We detected a new device or browser.
-                Please enter the OTP code sent to your email to continue.
-            </p>
-
-            {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-            {% for category, message in messages %}
-            <div class="alert alert-{{ category }}" style="color:red; font-weight:bold;">
-                {{ message }}
+    <div class="verify-container">
+        <div class="verify-card">
+            <!-- Header -->
+            <div class="verify-header">
+                <div class="verify-logo">
+                    <i class="fas fa-mobile-alt"></i> DEVICE VERIFICATION
+                </div>
+                <div class="verify-subtitle">Enter OTP sent to your email</div>
+                
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                    <div class="flash-modern flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% endwith %}
             </div>
-            {% endfor %}
-            {% endif %}
-            {% endwith %}
 
+            <!-- Device Info -->
+            <div class="device-info">
+                <div class="device-icon">
+                    <i class="fas fa-laptop"></i>
+                </div>
+                <div class="device-details">
+                    <h3>New Device Detected</h3>
+                    <p>For security reasons, please verify this is you</p>
+                    <div class="device-meta">
+                        <span><i class="fas fa-user"></i> {% if session.get('google_user_info') %}{{ session.google_user_info.name }}{% else %}User{% endif %}</span>
+                        <span><i class="fas fa-clock"></i> OTP expires in: <span id="countdown">60</span>s</span>
+                    </div>
+                </div>
+            </div>
 
-            <form method="POST" action="/verify-device">
-                <label>OTP Code</label>
-                <input type="text" name="otp" maxlength="6" required placeholder="Enter 6-digit code">
+            <!-- OTP Form -->
+            <form method="POST" action="/verify-device" id="otpForm">
+                <!-- OTP Input -->
+                <div class="form-group">
+                    <label class="form-label">6-Digit OTP</label>
+                    <div class="otp-input-container">
+                        <input type="text" name="otp" id="otp" class="form-input otp-input" 
+                               placeholder="Enter 6-digit code" 
+                               maxlength="6" 
+                               pattern="\d{6}" 
+                               required 
+                               autocomplete="off"
+                               autofocus>
+                        <div class="otp-hint">
+                            <i class="fas fa-info-circle"></i> Check your email for the verification code
+                        </div>
+                    </div>
+                </div>
 
-                <button type="submit" class="btn-primary" style="margin-top: 15px;">
-                    Verify Device
+                <!-- Countdown Timer -->
+                <div class="countdown-timer">
+                    <div class="countdown-bar">
+                        <div class="countdown-progress" id="countdownProgress"></div>
+                    </div>
+                    <div class="countdown-text">Time remaining: <span id="countdownText">60</span> seconds</div>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="btn-submit" id="verifyBtn">
+                    <i class="fas fa-check-circle"></i> Verify & Continue
                 </button>
             </form>
 
-            <p style="margin-top: 10px;">
-                Didn’t receive the code?
-                <a href="/resend-otp">Resend OTP</a>
-            </p>
+            <!-- Resend OTP -->
+            <div class="resend-section">
+                <p>Didn't receive the code?</p>
+                <a href="/resend-otp" class="btn-resend" id="resendBtn">
+                    <i class="fas fa-redo"></i> Resend OTP
+                </a>
+                <div class="resend-timer" id="resendTimer" style="display: none;">
+                    Resend available in <span id="timer">60</span> seconds
+                </div>
+            </div>
+
+            <!-- Alternative Actions -->
+            <div class="alternative-actions">
+                <p>Having trouble? Try:</p>
+                <div class="alternative-links">
+                    <a href="/login" class="btn-alternative">
+                        <i class="fas fa-sign-in-alt"></i> Back to Login
+                    </a>
+                    <a href="/" class="btn-alternative">
+                        <i class="fas fa-home"></i> Return to Home
+                    </a>
+                </div>
+            </div>
         </div>
-    </main>
+    </div>
 
+    <script>
+        // Countdown timer
+        let timeLeft = 60;
+        const countdownElement = document.getElementById('countdown');
+        const countdownText = document.getElementById('countdownText');
+        const countdownProgress = document.getElementById('countdownProgress');
+        const resendBtn = document.getElementById('resendBtn');
+        const resendTimer = document.getElementById('resendTimer');
+        const timerElement = document.getElementById('timer');
+
+        function updateCountdown() {
+            countdownElement.textContent = timeLeft;
+            countdownText.textContent = timeLeft;
+            timerElement.textContent = timeLeft;
+            
+            // Update progress bar
+            const progress = (timeLeft / 60) * 100;
+            countdownProgress.style.width = `${progress}%`;
+            
+            if (timeLeft > 0) {
+                timeLeft--;
+                setTimeout(updateCountdown, 1000);
+            } else {
+                // Enable resend button
+                resendBtn.style.display = 'inline-flex';
+                resendTimer.style.display = 'none';
+            }
+        }
+
+        // Start countdown on page load
+        updateCountdown();
+
+        // Form submission loading state
+        document.getElementById('otpForm').addEventListener('submit', function() {
+            const btn = document.getElementById('verifyBtn');
+            btn.classList.add('btn-loading');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+        });
+
+        // Auto-focus OTP input and auto-advance
+        const otpInput = document.getElementById('otp');
+        otpInput.focus();
+        
+        otpInput.addEventListener('input', function() {
+            if (this.value.length === 6) {
+                // Auto-submit when 6 digits entered
+                document.getElementById('otpForm').submit();
+            }
+        });
+
+        // Theme detection
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', currentTheme);
+    </script>
 </body>
-
 </html>

@@ -5,12 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register - Deepfake Detection</title>
     <link rel="stylesheet" href="../static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <!-- Background Elements -->
     <div class="bg-glow main-glow"></div>
     <div class="bg-glow top-right-glow"></div>
     <div class="bg-glow bottom-left-glow"></div>
+
+    <!-- Top Navigation Bar -->
+    <nav class="auth-navbar">
+        <div class="auth-navbar-container">
+            <a href="/" class="auth-navbar-brand">
+                <i class="fas fa-home"></i> Deepfake Detection
+            </a>
+            <div class="auth-navbar-links">
+                <a href="/" class="auth-navbar-link">
+                    <i class="fas fa-home"></i> Home
+                </a>
+                <a href="/login" class="auth-navbar-link">
+                    <i class="fas fa-sign-in-alt"></i> Login
+                </a>
+            </div>
+        </div>
+    </nav>
 
     <div class="auth-container">
         <div class="auth-card">
@@ -40,35 +58,72 @@
                 <div class="form-group">
                     <label class="form-label">Full Name</label>
                     <input type="text" name="name" class="form-input" placeholder="Enter your full name" required>
+                    <div class="form-hint">
+                        <i class="fas fa-info-circle"></i> Your display name on the platform
+                    </div>
                 </div>
 
                 <!-- Email -->
                 <div class="form-group">
                     <label class="form-label">Email Address</label>
                     <input type="email" name="email" class="form-input" placeholder="Enter your email" required>
+                    <div class="form-hint">
+                        <i class="fas fa-envelope"></i> We'll send verification emails to this address
+                    </div>
                 </div>
 
                 <!-- Password -->
                 <div class="form-group">
                     <label class="form-label">Password</label>
-                    <input type="password" name="password" id="password" class="form-input" placeholder="Create a strong password" required>
+                    <div class="password-input-wrapper">
+                        <input type="password" name="password" id="password" class="form-input" placeholder="Create a strong password" required>
+                        <button type="button" class="password-toggle" id="togglePassword">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
                     
                     <!-- Password Strength -->
                     <div class="password-strength">
                         <div class="strength-bar" id="strengthBar"></div>
+                        <div class="strength-text" id="strengthText">Password strength</div>
                     </div>
                     
                     <!-- Password Hints -->
                     <div class="password-hints" id="passwordHints">
-                        <span id="lengthHint">• At least 8 characters</span>
-                        <span id="upperHint">• One uppercase letter</span>
-                        <span id="specialHint">• One special character</span>
+                        <span id="lengthHint"><i class="fas fa-circle"></i> At least 8 characters</span>
+                        <span id="upperHint"><i class="fas fa-circle"></i> One uppercase letter</span>
+                        <span id="lowerHint"><i class="fas fa-circle"></i> One lowercase letter</span>
+                        <span id="numberHint"><i class="fas fa-circle"></i> One number</span>
+                        <span id="specialHint"><i class="fas fa-circle"></i> One special character</span>
                     </div>
+                </div>
+
+                <!-- Confirm Password -->
+                <div class="form-group">
+                    <label class="form-label">Confirm Password</label>
+                    <div class="password-input-wrapper">
+                        <input type="password" name="confirm_password" id="confirmPassword" class="form-input" placeholder="Confirm your password" required>
+                        <button type="button" class="password-toggle" id="toggleConfirmPassword">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="password-match" id="passwordMatch">
+                        <i class="fas fa-check-circle"></i> Passwords match
+                    </div>
+                </div>
+
+                <!-- Terms and Conditions -->
+                <div class="form-group terms-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="terms" id="terms" required>
+                        <span class="checkmark"></span>
+                        <span>I agree to the <a href="/terms" class="terms-link">Terms of Service</a> and <a href="/privacy" class="terms-link">Privacy Policy</a></span>
+                    </label>
                 </div>
 
                 <!-- Submit Button -->
                 <button type="submit" class="btn-submit" id="registerBtn">
-                    Create Account
+                    <i class="fas fa-user-plus"></i> Create Account
                 </button>
             </form>
 
@@ -85,30 +140,63 @@
 
             <!-- Links -->
             <div class="auth-links">
-                <span style="color: var(--text-subtle);">Already have an account? </span>
-                <a href="/login" class="auth-link">Sign in</a>
+                <div class="auth-link-group">
+                    <span style="color: var(--text-subtle);">Already have an account? </span>
+                    <a href="/login" class="auth-link">
+                        <i class="fas fa-sign-in-alt"></i> Sign in here
+                    </a>
+                </div>
+                
+                <!-- Optional: Add a small note -->
+                <div class="auth-note">
+                    <i class="fas fa-shield-alt"></i> Your data is protected with 256-bit encryption
+                </div>
             </div>
         </div>
     </div>
 
+
+
     <script>
         // Password strength indicator
         const passwordInput = document.getElementById('password');
+        const confirmPasswordInput = document.getElementById('confirmPassword');
         const strengthBar = document.getElementById('strengthBar');
+        const strengthText = document.getElementById('strengthText');
         const errorBox = document.getElementById('errorBox');
+        const passwordMatch = document.getElementById('passwordMatch');
         
         // Password hints elements
         const lengthHint = document.getElementById('lengthHint');
         const upperHint = document.getElementById('upperHint');
+        const lowerHint = document.getElementById('lowerHint');
+        const numberHint = document.getElementById('numberHint');
         const specialHint = document.getElementById('specialHint');
-
-        passwordInput.addEventListener('input', function() {
-            const password = this.value;
-            let strength = 0;
+        
+        // Password toggle buttons
+        const togglePassword = document.getElementById('togglePassword');
+        const toggleConfirmPassword = document.getElementById('toggleConfirmPassword');
+        
+        // Password toggle functionality
+        togglePassword.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+        });
+        
+        toggleConfirmPassword.addEventListener('click', function() {
+            const type = confirmPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            confirmPasswordInput.setAttribute('type', type);
+            this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+        });
+        
+        // Password strength checker
+        function checkPasswordStrength(password) {
+            let score = 0;
             
             // Length check
             if (password.length >= 8) {
-                strength += 1;
+                score += 1;
                 lengthHint.classList.add('valid');
             } else {
                 lengthHint.classList.remove('valid');
@@ -116,50 +204,123 @@
             
             // Uppercase check
             if (/[A-Z]/.test(password)) {
-                strength += 1;
+                score += 1;
                 upperHint.classList.add('valid');
             } else {
                 upperHint.classList.remove('valid');
             }
             
+            // Lowercase check
+            if (/[a-z]/.test(password)) {
+                score += 1;
+                lowerHint.classList.add('valid');
+            } else {
+                lowerHint.classList.remove('valid');
+            }
+            
+            // Number check
+            if (/[0-9]/.test(password)) {
+                score += 1;
+                numberHint.classList.add('valid');
+            } else {
+                numberHint.classList.remove('valid');
+            }
+            
             // Special character check
             if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-                strength += 1;
+                score += 1;
                 specialHint.classList.add('valid');
             } else {
                 specialHint.classList.remove('valid');
             }
             
+            return score;
+        }
+        
+        // Update password strength
+        passwordInput.addEventListener('input', function() {
+            const password = this.value;
+            const score = checkPasswordStrength(password);
+            
             // Update strength bar
             strengthBar.className = 'strength-bar';
-            if (strength === 1) {
+            if (score <= 2) {
                 strengthBar.classList.add('strength-weak');
-            } else if (strength === 2) {
+                strengthText.textContent = 'Weak password';
+                strengthText.style.color = 'var(--red-fake)';
+            } else if (score <= 4) {
                 strengthBar.classList.add('strength-medium');
-            } else if (strength === 3) {
+                strengthText.textContent = 'Medium strength';
+                strengthText.style.color = 'var(--accent-orange)';
+            } else {
                 strengthBar.classList.add('strength-strong');
+                strengthText.textContent = 'Strong password';
+                strengthText.style.color = 'var(--green-real)';
             }
+            
+            // Check password match
+            checkPasswordMatch();
         });
-
+        
+        // Check password match
+        confirmPasswordInput.addEventListener('input', checkPasswordMatch);
+        
+        function checkPasswordMatch() {
+            const password = passwordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
+            
+            if (confirmPassword === '') {
+                passwordMatch.style.display = 'none';
+                return;
+            }
+            
+            if (password === confirmPassword && password !== '') {
+                passwordMatch.style.display = 'flex';
+                confirmPasswordInput.style.borderColor = 'var(--green-real)';
+            } else {
+                passwordMatch.style.display = 'none';
+                confirmPasswordInput.style.borderColor = 'var(--red-fake)';
+            }
+        }
+        
         // Form validation
         document.getElementById('registerForm').addEventListener('submit', function(e) {
             const password = passwordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
+            const terms = document.getElementById('terms').checked;
             let errors = [];
             
+            // Password validation
             if (password.length < 8) {
                 errors.push("Password must be at least 8 characters long");
             }
             if (!/[A-Z]/.test(password)) {
                 errors.push("Password must contain at least one uppercase letter");
             }
+            if (!/[a-z]/.test(password)) {
+                errors.push("Password must contain at least one lowercase letter");
+            }
+            if (!/[0-9]/.test(password)) {
+                errors.push("Password must contain at least one number");
+            }
             if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
                 errors.push("Password must contain at least one special character");
+            }
+            
+            // Password match
+            if (password !== confirmPassword) {
+                errors.push("Passwords do not match");
+            }
+            
+            // Terms and conditions
+            if (!terms) {
+                errors.push("You must agree to the Terms of Service and Privacy Policy");
             }
             
             if (errors.length > 0) {
                 e.preventDefault();
                 errorBox.style.display = 'block';
-                errorBox.innerHTML = errors.join('<br>');
+                errorBox.innerHTML = '<strong>Please fix the following errors:</strong><br>' + errors.join('<br>');
                 
                 // Scroll to error
                 errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -167,20 +328,36 @@
                 // Show loading state
                 const btn = document.getElementById('registerBtn');
                 btn.classList.add('btn-loading');
-                btn.innerHTML = 'Creating Account...';
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Account...';
             }
         });
-
+        
         // Input focus effects
         const inputs = document.querySelectorAll('.form-input');
         inputs.forEach(input => {
             input.addEventListener('focus', function() {
                 this.style.background = 'var(--bg-secondary)';
+                this.style.borderColor = 'var(--blue-cobalt)';
             });
             input.addEventListener('blur', function() {
                 this.style.background = 'var(--bg-tertiary)';
+                this.style.borderColor = 'rgba(0, 132, 255, 0.3)';
             });
         });
+        
+        // Theme detection
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', currentTheme);
+        
+        // Auto-hide flash messages after 5 seconds
+        setTimeout(() => {
+            const flashMessages = document.querySelectorAll('.flash-modern');
+            flashMessages.forEach(msg => {
+                msg.style.opacity = '0';
+                msg.style.transition = 'opacity 0.5s';
+                setTimeout(() => msg.remove(), 500);
+            });
+        }, 5000);
     </script>
 </body>
 </html>

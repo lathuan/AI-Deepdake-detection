@@ -61,17 +61,6 @@
                 </div>
             </div>
 
-            <!-- Account Statistics -->
-            <div class="account-stats">
-                <div class="stat-card">
-                    <div class="stat-number">0</div>
-                    <div class="stat-label">Lần phân tích</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">0</div>
-                    <div class="stat-label">Video đã xử lý</div>
-                </div>
-            </div>
 
             <!-- Account Actions -->
             <div class="account-actions">
@@ -100,7 +89,7 @@
                         <span class="security-label">Xác thực 2 yếu tố</span>
                         <span class="security-desc">Bảo vệ tài khoản bằng OTP qua email</span>
                     </div>
-                    <span class="security-status status-active">Bật</span>
+                    
                 </div>
                 
                 <div class="security-item">
@@ -108,18 +97,10 @@
                         <span class="security-label">Đăng nhập Google</span>
                         <span class="security-desc">Kết nối với tài khoản Google</span>
                     </div>
-                    <span class="security-status {% if user.password %}status-inactive{% else %}status-active{% endif %}">
-                        {% if user.password %}Tắt{% else %}Bật{% endif %}
-                    </span>
+
                 </div>
                 
-                <div class="security-item">
-                    <div class="security-info">
-                        <span class="security-label">Thiết bị tin cậy</span>
-                        <span class="security-desc">Quản lý thiết bị đã đăng nhập</span>
-                    </div>
-                    <span class="security-status status-active">1 thiết bị</span>
-                </div>
+
             </div>
 
             

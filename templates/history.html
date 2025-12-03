@@ -23,9 +23,16 @@
             <a href="/history" class="nav-item">{{ t.history }}</a>
             <a href="/settings" class="nav-item">{{ t.settings }}</a>
         </div>
-        <div class="user-profile" id="userProfileButton">
-            <img src="{{ user.icon_url }}" alt="Profile Icon" class="user-icon">
+
+        <div class="nav-right">
+            {% if session.get("user_id") %}
+                <a href="/account" class="btn-primary">Account</a>
+            {% else %}
+                <a href="/login" class="btn-primary">Login</a>
+                <a href="/register" class="btn-primary">Register</a>
+            {% endif %}
         </div>
+
     </nav>
     
     <div class="profile-panel" id="profilePanel">
