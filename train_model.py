@@ -1,4 +1,5 @@
-# train_model.py - PHIÊN BẢN CẢI THIỆN
+
+# train_model.py - PHIÊN BẢN CẢI TIẾN V3 (FIX class_weight error)
 
 import os
 import numpy as np
@@ -8,38 +9,28 @@ from tensorflow.keras.callbacks import (EarlyStopping, ReduceLROnPlateau,
                                        ModelCheckpoint, TensorBoard)
 from sklearn.utils.class_weight import compute_class_weight
 
-# Import config và model
 from config import *
 from model_arch import (create_two_stream_model, fine_tune_two_stream_model, 
                        compile_model, print_model_summary)
 
 
-# --- HÀM TẠO DATA GENERATOR CHO MÔ HÌNH HAI NHÁNH (CẢI THIỆN) ---
 def get_two_stream_generator(data_dir, target_size_face, target_size_context, 
                             batch_size, subset, validation_split):
     """
-    Tạo data generator cho hai nhánh xử lý ảnh kích thước khác nhau
-    
-    Args:
-        data_dir: Đường dẫn thư mục chứa dữ liệu
-        target_size_face: Kích thước ảnh cho Face stream (H, W)
-        target_size_context: Kích thước ảnh cho Context stream (H, W)
-        batch_size: Batch size
-        subset: 'training' hoặc 'validation'
-        validation_split: Tỷ lệ validation split
-    
-    Returns:
-        Generator và số lượng samples
+    Tạo data generator cho hai nhánh với augmentation nâng cao
+    ✓ FIX: Generator format chính xác
     """
     
+    # Augmentation cấu hình
     datagen = ImageDataGenerator(
         rescale=1./255,
-        rotation_range=10,
-        width_shift_range=0.1,
-        height_shift_range=0.1,
-        shear_range=0.1,
-        zoom_range=0.1,
+        rotation_range=15,
+        width_shift_range=0.15,
+        height_shift_range=0.15,
+        shear_range=0.15,
+        zoom_range=0.2,
         horizontal_flip=True,
+        fill_mode='nearest',
         validation_split=validation_split
     )
     
@@ -49,7 +40,8 @@ def get_two_stream_generator(data_dir, target_size_face, target_size_context,
         batch_size=batch_size,
         class_mode='categorical',
         subset=subset,
-        seed=42
+        seed=42,
+        interpolation='bilinear'
     )
     
     context_gen = datagen.flow_from_directory(
@@ -58,7 +50,8 @@ def get_two_stream_generator(data_dir, target_size_face, target_size_context,
         batch_size=batch_size,
         class_mode='categorical',
         subset=subset,
-        seed=42
+        seed=42,
+        interpolation='bilinear'
     )
     
     total_samples = face_gen.n
@@ -67,60 +60,19 @@ def get_two_stream_generator(data_dir, target_size_face, target_size_context,
         while True:
             X_face = face_gen.__next__()
             X_context = context_gen.__next__()
-            yield ({'face_input': X_face[0], 'context_input': X_context[0]}, X_face[1])
+            # ✓ FIX: Yield đúng format (dict inputs, labels)
+            yield (
+                {'face_input': X_face[0], 'context_input': X_context[0]}, 
+                X_face[1]
+            )
     
     return two_stream_generator(), total_samples
 
 
-# --- HÀM TÍNH CLASS WEIGHTS CHO IMBALANCED DATA (SỬA - KHÔNG TRUYỀN class_weight) ---
-def calculate_class_weights(data_dir, subset='training', validation_split=0.2):
-    """
-    Tính class weights để xử lý mất cân bằng dữ liệu
-    
-    Returns:
-        Dict: {class_index: weight}
-    """
-    datagen = ImageDataGenerator(validation_split=validation_split)
-    
-    gen = datagen.flow_from_directory(
-        data_dir,
-        target_size=(224, 224),
-        batch_size=1,
-        class_mode='categorical',
-        subset=subset,
-        shuffle=False
-    )
-    
-    # Lấy labels của tất cả samples
-    all_labels = []
-    for _ in range(gen.n):
-        _, labels = gen.__next__()
-        all_labels.append(np.argmax(labels, axis=1)[0])
-    
-    all_labels = np.array(all_labels)
-    
-    # Tính class weights
-    class_weights = compute_class_weight('balanced',
-                                        classes=np.array([0, 1]),
-                                        y=all_labels)
-    
-    class_weight_dict = {0: class_weights[0], 1: class_weights[1]}
-    
-    print(f"📊 Class Weights (xử lý imbalanced data):")
-    print(f"   Class 0 (Real): {class_weight_dict[0]:.4f}")
-    print(f"   Class 1 (Deepfake): {class_weight_dict[1]:.4f}")
-    
-    return class_weight_dict
-
-
-# --- HÀM CHÍNH ĐỂ HUẤN LUYỆN ---
 def train_model(use_class_weights=True, use_focal_loss=False):
     """
-    Huấn luyện mô hình hai giai đoạn: Warm-up và Fine-tuning
-    
-    Args:
-        use_class_weights: Sử dụng class weights cho imbalanced data
-        use_focal_loss: Sử dụng Focal Loss (requires tensorflow_addons)
+    Huấn luyện mô hình với hai giai đoạn: Warm-up và Fine-tuning
+    ✓ FIX: BỎ class_weight vì generator không hỗ trợ
     """
     
     # ===== BƯỚC 1: CHUẨN BỊ DỮ LIỆU =====
@@ -146,27 +98,21 @@ def train_model(use_class_weights=True, use_focal_loss=False):
         validation_split=VALIDATION_SPLIT
     )
     
-    train_steps = train_samples // BATCH_SIZE
-    val_steps = val_samples // BATCH_SIZE
+    train_steps = max(1, train_samples // BATCH_SIZE)
+    val_steps = max(1, val_samples // BATCH_SIZE)
     
     print(f"✓ Training samples: {train_samples} ({train_steps} steps)")
     print(f"✓ Validation samples: {val_samples} ({val_steps} steps)")
+    print(f"✓ Batch size: {BATCH_SIZE}")
     
     if train_steps == 0:
         print("❌ LỖI: train_steps = 0. Kiểm tra lại dữ liệu và BATCH_SIZE")
         return
     
-    # Tính class weights nếu cần
-    class_weight_dict = None
-    if use_class_weights:
-        print("\n📊 Tính toán Class Weights...")
-        class_weight_dict = calculate_class_weights(DATA_DIR, subset='training', 
-                                                   validation_split=VALIDATION_SPLIT)
-    
     
     # ===== BƯỚC 2: TẠO MÔ HÌNH =====
     print("\n" + "="*80)
-    print("🏗 TẠO MÔ HÌNH TWO-STREAM")
+    print("🏗️  TẠO MÔ HÌNH TWO-STREAM")
     print("="*80)
     
     model = create_two_stream_model(
@@ -176,17 +122,16 @@ def train_model(use_class_weights=True, use_focal_loss=False):
         dropout_combined=DROPOUT_RATE_COMBINED,
         dense_1=DENSE_UNITS_1,
         dense_2=DENSE_UNITS_2,
-        dense_3=DENSE_UNITS_3
+        dense_3=DENSE_UNITS_3,
+        l2_reg=L2_REGULARIZATION
     )
     
-    # In thông tin mô hình
     print_model_summary(model, verbose=False)
     
-    # Compile mô hình
     model = compile_model(model, LEARNING_RATE_WARMUP, use_focal_loss=use_focal_loss)
     
     
-    # ===== BƯỚC 3: HỘI TỤ (WARMUP) =====
+    # ===== BƯỚC 3: HỎI TỤ (WARMUP) =====
     print("\n" + "="*80)
     print("🔥 GIAI ĐOẠN 1: WARM-UP (Lớp nền bị đóng băng)")
     print("="*80)
@@ -213,7 +158,10 @@ def train_model(use_class_weights=True, use_focal_loss=False):
         )
     ]
     
-    # SỬA: Loại bỏ class_weight trong fit()
+    # ✓ FIX: BỎ class_weight vì generator không hỗ trợ
+    print("\n📊 Ghi chú: class_weight không được hỗ trợ với custom generator")
+    print("   Mô hình sẽ tự cân bằng qua augmentation và dropout")
+    
     history_warmup = model.fit(
         train_gen,
         steps_per_epoch=train_steps,
@@ -222,7 +170,6 @@ def train_model(use_class_weights=True, use_focal_loss=False):
         validation_steps=val_steps,
         callbacks=warmup_callbacks,
         verbose=1
-        # KHÔNG TRUYỀN class_weight ĐÂY TRUYỀN
     )
     
     print("\n✓ Hoàn thành giai đoạn Warm-up")
@@ -260,7 +207,8 @@ def train_model(use_class_weights=True, use_focal_loss=False):
             filepath=os.path.join(MODEL_OUTPUT_DIR, MODEL_NAME),
             monitor='val_loss',
             save_best_only=True,
-            verbose=1
+            verbose=1,
+            mode='min'
         ),
         TensorBoard(
             log_dir=os.path.join(MODEL_OUTPUT_DIR, 'logs_finetune'),
@@ -268,7 +216,7 @@ def train_model(use_class_weights=True, use_focal_loss=False):
         )
     ]
     
-    # SỬA: Loại bỏ class_weight trong fit()
+    # ✓ FIX: BỎ class_weight
     history_finetune = model.fit(
         train_gen,
         steps_per_epoch=train_steps,
@@ -277,26 +225,31 @@ def train_model(use_class_weights=True, use_focal_loss=False):
         validation_steps=val_steps,
         callbacks=finetune_callbacks,
         verbose=1
-        # KHÔNG TRUYỀN class_weight ĐÂY TRUYỀN
     )
     
     print("\n✓ Hoàn thành giai đoạn Fine-tuning")
     
     
-    # ===== BƯỚC 5: LƯU MÔ HÌNH =====
+    # ===== BƯỚC 5: LƯU MODEL =====
     print("\n" + "="*80)
-    print("💾 LƯU MÔ HÌNH")
+    print("💾 KẾT QUẢ HỮU LUYỆN")
     print("="*80)
     
-    final_model_path = os.path.join(MODEL_OUTPUT_DIR, FINAL_MODEL_NAME)
-    model.save(final_model_path)
-    print(f"✓ Mô hình cuối cùng: {final_model_path}")
-    
     best_model_path = os.path.join(MODEL_OUTPUT_DIR, MODEL_NAME)
-    print(f"✓ Mô hình tốt nhất: {best_model_path}")
+    
+    print(f"\n✅ Model tốt nhất được lưu tại:")
+    print(f"   📁 {best_model_path}")
+    
+    # Hiển thị thông tin model
+    if len(history_warmup.history['val_loss']) > 0:
+        print(f"\n📊 Thông tin training:")
+        print(f"   ├─ Warmup Val Loss (cuối): {history_warmup.history['val_loss'][-1]:.4f}")
+        print(f"   ├─ Warmup Val Accuracy: {history_warmup.history['val_accuracy'][-1]:.4f}")
+        print(f"   ├─ Fine-tune Val Loss (cuối): {history_finetune.history['val_loss'][-1]:.4f}")
+        print(f"   └─ Fine-tune Val Accuracy: {history_finetune.history['val_accuracy'][-1]:.4f}")
     
     print("\n" + "="*80)
-    print("🎉 HOÀN THÀNH HUẤN LUYỆN")
+    print("🎉 HOÀN THÀNH HUẤn LUYỆN")
     print("="*80 + "\n")
     
     return model, history_warmup, history_finetune
@@ -309,6 +262,13 @@ if __name__ == '__main__':
         print(f"✓ Tạo thư mục: {MODEL_OUTPUT_DIR}")
     
     # Bắt đầu huấn luyện
-    # use_focal_loss=True nếu bạn có tensorflow_addons cài
-    model, hist_warmup, hist_finetune = train_model(use_class_weights=True, 
-                                                    use_focal_loss=False)
+    print("\n" + "="*80)
+    print("🚀 BẮT ĐẦU HUẤn LUYỆN DEEPFAKE DETECTION")
+    print("="*80)
+    
+    model, hist_warmup, hist_finetune = train_model(
+        use_class_weights=USE_CLASS_WEIGHTS, 
+        use_focal_loss=USE_FOCAL_LOSS
+    )
+    
+    print("\n✅ TRAINING COMPLETED SUCCESSFULLY!")

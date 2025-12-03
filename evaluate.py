@@ -1,5 +1,5 @@
-# Code đánh giá mô hình
-# evaluate.py - ĐÁNH GIÁ & TEST MÔ HÌNH
+
+# evaluate.py - ĐÁNH GIÁ & TEST MÔ HÌNH (Phiên bản cải tiến)
 
 import os
 import numpy as np
@@ -88,10 +88,10 @@ def get_predictions_and_labels(model, test_gen, test_steps, total_samples):
     return predictions, true_labels
 
 
-# --- HÀM TÍNH CÁC METRICS ---
+# --- HÀM TÍNH METRICS ---
 def calculate_metrics(predictions, true_labels):
     """
-    Tính toàn bộ metrics cho binary classification
+    Tính toán bộ metrics cho binary classification
     
     Returns:
         Dict chứa các metrics
@@ -219,10 +219,11 @@ def plot_precision_recall_curve(predictions, true_labels, save_path=None):
     return pr_auc
 
 
-# --- HÀM CHÍNH ĐỂ EVALUATE ---
+# --- HÀM CHÍNH EVALUATE ---
 def evaluate_model(model_path, plot_results=True, save_figures=True):
     """
     Đánh giá mô hình trên validation set
+    ✓ SỬA: Dùng best_deepfake_model.keras
     
     Args:
         model_path: Đường dẫn đến model file
@@ -346,7 +347,7 @@ def predict_single_image(model_path, face_image_path, context_image_path):
 
 
 if __name__ == '__main__':
-    # Đánh giá mô hình
+    # ✓ SỬA: Dùng best model
     model_path = os.path.join(MODEL_OUTPUT_DIR, MODEL_NAME)
     
     metrics = evaluate_model(model_path, plot_results=True, save_figures=True)
