@@ -1,18 +1,12 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Login - Deepfake Detection</title>
     <link rel="stylesheet" href="../static/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-
-    <title>Đăng Nhập - Deepfake AI</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script src="https://www.google.com/recaptcha/api.js?hl=vi&render=explicit" async defer></script>
-
 </head>
 <body>
     <!-- Background Elements -->
@@ -42,7 +36,7 @@
             <!-- Header -->
             <div class="auth-header">
                 <div class="auth-logo">DEEPFAKE AI</div>
-                <div class="auth-subtitle">Đăng nhập vào tài khoản của bạn</div>
+                <div class="auth-subtitle">Login to your account</div>
             </div>
 
             <!-- Flash Messages -->
@@ -60,59 +54,55 @@
             <form method="POST" action="{{ url_for('login') }}" id="loginForm">
                 <!-- Email -->
                 <div class="form-group">
-                    <label class="form-label">Địa Chỉ Email</label>
-                    <input type="email" name="email" class="form-input" placeholder="Nhập email của bạn" required>
+                    <label class="form-label">Email Address</label>
+                    <input type="email" name="email" class="form-input" placeholder="Enter your email" required>
                 </div>
 
                 <!-- Password -->
                 <div class="form-group">
-                    <label class="form-label">Mật Khẩu</label>
-                    <input type="password" name="password" class="form-input" placeholder="Nhập mật khẩu" required>
+                    <label class="form-label">Password</label>
+                    <input type="password" name="password" class="form-input" placeholder="Enter your password" required>
                 </div>
 
                 <!-- reCAPTCHA Container -->
                 <div class="form-group">
-                    <label class="form-label">Xác Nhận Bạn Không Phải Robot</label>
                     <div id="recaptcha-container" class="recaptcha-modern"></div>
                     <input type="hidden" name="g-recaptcha-response" id="recaptcha-response">
                 </div>
 
                 <!-- Submit Button -->
-<<<<<<< HEAD
-                <button type="submit" class="btn-submit" id="loginBtn">
-                    <i class="fas fa-sign-in-alt"></i> Sign In
-                </button>
-=======
-                <button type="submit" class="btn-submit" id="loginBtn" disabled>Đăng Nhập</button>
->>>>>>> 654be63b01f72d1db993a92a6d05008c81e5a198
+                <div class="form-group">
+                    <button type="submit" class="btn-login" id="loginBtn">
+                        Sign In
+                    </button>
+                </div>
             </form>
 
             <!-- QR Code Section -->
             <div class="qr-section">
                 <div class="qr-header">
-                    <h3>Hoặc quét QR để đăng nhập qua Google</h3>
-                    <p>Quét bằng camera điện thoại để đăng nhập nhanh</p>
+                    <h3>Or scan QR code to login with Google</h3>
+                    <p>Scan with your phone camera for quick login</p>
                 </div>
                 <div id="qr-container" class="qr-container">
                     <img id="qr-image" src="" alt="QR Code Login" style="display: none;">
-                    <p id="qr-loading">Đang tải QR code...</p>
+                    <p id="qr-loading">Loading QR code...</p>
                 </div>
             </div>
 
             <!-- Divider -->
             <div class="auth-divider">
-                <span>Hoặc tiếp tục với</span>
+                <span>Or continue with</span>
             </div>
 
             <!-- OAuth -->
             <a href="{{ url_for('auth_google') }}" class="btn-oauth">
                 <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google">
-                Tiếp Tục Với Google
+                Continue with Google
             </a>
 
             <!-- Links -->
             <div class="auth-links">
-
                 <a href="/forgot-password" class="auth-link">
                     <i class="fas fa-key"></i> Forgot your password?
                 </a>
@@ -121,15 +111,9 @@
                 <a href="/register" class="auth-link">
                     <i class="fas fa-user-plus"></i> Create account
                 </a>
-
-                <a href="{{ url_for('register') }}" class="auth-link">Đăng Ký</a>
-                <a href="{{ url_for('forgot_password') }}" class="auth-link">Quên Mật Khẩu?</a>
-
             </div>
         </div>
     </div>
-
-
 
     <script>
         let recaptchaWidgetId;
@@ -157,22 +141,18 @@
             grecaptcha.reset(recaptchaWidgetId);
         }
 
-        // Kiểm tra submit
+        // Check submit
         document.getElementById('loginForm').addEventListener('submit', function(e) {
             const response = document.getElementById('recaptcha-response').value;
             if (!response) {
                 e.preventDefault();
-                alert('Vui lòng xác nhận bạn không phải là robot!');
+                alert('Please confirm you are not a robot!');
                 grecaptcha.execute(recaptchaWidgetId, {action: 'login'});
                 return false;
             }
             const btn = document.getElementById('loginBtn');
             btn.classList.add('btn-loading');
-
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
-
-            btn.innerHTML = 'Đang Đăng Nhập...';
-
         });
 
         // Load QR Code
@@ -184,8 +164,8 @@
                 document.getElementById('qr-loading').style.display = 'none';
             })
             .catch(error => {
-                console.error('Lỗi tải QR:', error);
-                document.getElementById('qr-loading').innerHTML = 'Lỗi tải QR code';
+                console.error('Error loading QR:', error);
+                document.getElementById('qr-loading').innerHTML = 'Error loading QR code';
             });
 
         // Load recaptcha
