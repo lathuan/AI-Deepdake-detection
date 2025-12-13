@@ -5,6 +5,111 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Deepfake Detection</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* CSS for explanations (English ready) */
+        .feature-explanation {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 3px solid var(--accent-purple);
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+       
+        .feature-explanation h4 {
+            color: var(--accent-purple);
+            margin: 0 0 10px 0;
+            font-size: 1.1em;
+        }
+       
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 10px 0;
+        }
+       
+        .feature-item {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 6px;
+            border-left: 3px solid #666;
+        }
+       
+        .feature-item.high {
+            border-left-color: var(--red-fake);
+            background: rgba(255, 68, 68, 0.1);
+        }
+       
+        .feature-item.medium {
+            border-left-color: #ffaa00;
+            background: rgba(255, 170, 0, 0.1);
+        }
+       
+        .feature-item.low {
+            border-left-color: var(--green-real);
+            background: rgba(68, 255, 68, 0.1);
+        }
+       
+        .feature-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+       
+        .feature-severity {
+            font-size: 0.85em;
+            padding: 2px 8px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+       
+        .feature-description {
+            color: var(--text-secondary);
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+       
+        .feature-confidence {
+            margin-top: 5px;
+            font-size: 0.9em;
+            color: #999;
+        }
+       
+        .summary-box {
+            background: linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(75, 0, 130, 0.2));
+            border: 1px solid var(--accent-purple);
+            padding: 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            white-space: pre-line;
+        }
+       
+        .risk-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+       
+        .risk-badge.high {
+            background: var(--red-fake);
+            color: white;
+        }
+       
+        .risk-badge.medium {
+            background: #ffaa00;
+            color: black;
+        }
+       
+        .risk-badge.low {
+            background: var(--green-real);
+            color: black;
+        }
+    </style>
 </head>
 <body>
     <!-- Background Glow -->
@@ -61,7 +166,7 @@
             <p class="instruction">{{ t.supported_formats }}</p>
         </section>
 
-        <!-- SAVE HISTORY NOTIFICATION -->
+        <!-- SAVE HISTORY NOTIFICATION (hiển thị tên file) -->
         <div id="saveHistoryNotification" class="save-history-notification">
             <p>{{ t.save_to_history|replace('{}', '<strong><span id="notifyFilename"></span></strong>')|safe }}</p>
             <div class="notification-buttons">
@@ -71,7 +176,7 @@
             <p id="notifyMessage"></p>
         </div>
 
-        <!-- LIVE RESULT (from new prediction) -->
+        <!-- LIVE RESULT -->
         <section class="panel" id="resultSection" style="display:none;">
             <h2>{{ t.analysis_result }}</h2>
 
@@ -113,60 +218,92 @@ const saveHistoryNotification = document.getElementById("saveHistoryNotification
 const notifyFilename = document.getElementById("notifyFilename");
 const notifySaveBtn = document.getElementById("notifySaveBtn");
 const notifyDiscardBtn = document.getElementById("notifyDiscardBtn");
-const notifyMessage = document.getElementById("notifyMessage");
 
 let currentTempId = null;
-let currentFilename = null;
+let currentFilename = '';
 
-/* FILE SELECT */
-videoInput.addEventListener("change", () => {
-    const f = videoInput.files[0];
-    videoInputName.textContent = f ? f.name : "{{ t.no_file }}";
-    currentFilename = f ? f.name : null;
-    console.log("File selected:", f ? {name: f.name, size: f.size, type: f.type} : "No file");
-});
-
-/* RENDER RESULT */
+/* RENDER RESULTS (English labels & fallback) */
 function renderResults(data) {
     console.log("Rendering results:", data);
-    
-    const isFake = data.prediction === "FAKE";
-    predictionBox.style.borderColor = isFake ? "var(--red-fake)" : "var(--green-real)";
-    predictionBox.style.boxShadow = `0 0 15px ${isFake ? "var(--red-fake)" : "var(--green-real)"}`;
 
-    predictionText.textContent = data.prediction;
-    predictionText.className = `prediction-value ${isFake ? "fake" : "real"}`;
+    // Clear previous results
+    framesGallery.innerHTML = '';
+    timelineImg.style.display = 'none';
+    timelineHeader.style.display = 'none';
 
-    confidenceText.textContent = `{{ t.confidence }}: ${(data.confidence * 100).toFixed(2)}%`;
+    // Prediction box
+    const pred = data.prediction || 'UNKNOWN';
+    const conf = data.confidence || 0;
+    predictionText.textContent = pred;
+    predictionText.className = pred === 'FAKE' ? 'prediction-fake' : 'prediction-real';
+    confidenceText.textContent = `Confidence: ${(conf * 100).toFixed(1)}%`;
 
-    /* TIMELINE */
+    // Timeline
     if (data.timeline_base64) {
-        timelineImg.src = "data:image/png;base64," + data.timeline_base64;
-        timelineImg.style.display = "block";
-        timelineHeader.style.display = "block";
-        console.log("Timeline image loaded");
+        timelineImg.src = `data:image/png;base64,${data.timeline_base64}`;
+        timelineImg.style.display = 'block';
+        timelineHeader.style.display = 'block';
     }
 
-    /* FRAMES */
-    framesGallery.innerHTML = "";
+    // Frames gallery (English)
     if (data.frames_base64 && data.frames_base64.length > 0) {
-        console.log(`Rendering ${data.frames_base64.length} frames`);
-        data.frames_base64.forEach(f => {
-            const box = document.createElement("div");
-            box.className = "frame-item";
-            box.style.borderColor = f.is_suspicious ? "var(--red-fake)" : "var(--accent-purple)";
+        data.frames_base64.forEach((f, idx) => {
+            const box = document.createElement('div');
+            box.className = 'frame-box';
+
+            // Render Summary (English)
+            let summaryHTML = '';
+            if (f.summary) {
+                summaryHTML = `
+                    <div class="summary-box">
+                        <strong>📊 Summary:</strong><br>
+                        ${f.summary.replace(/\n/g, '<br>')}
+                        <span class="risk-badge ${f.risk_level}">${f.risk_level.toUpperCase()}</span>
+                    </div>
+                `;
+            }
+
+            // Render Features (English fallback)
+            let featuresHTML = '';
+            if (f.features && f.features.length > 0) {
+                featuresHTML = `
+                    <div class="feature-explanation">
+                        <h4>🔍 Suspicious Features (${f.num_suspicious_features})</h4>
+                        <ul class="feature-list">
+                            ${f.features.map(feature => `
+                                <li class="feature-item ${feature.severity}">
+                                    <div class="feature-name">
+                                        <span>${feature.name}</span>
+                                        <span class="feature-severity">${feature.severity.toUpperCase()}</span>
+                                    </div>
+                                    <div class="feature-description">${feature.description}</div>
+                                    <div class="feature-confidence">Confidence: ${(feature.confidence * 100).toFixed(1)}%</div>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                `;
+            } else {
+                featuresHTML = '<div class="feature-explanation"><p>No suspicious features detected.</p></div>';
+            }
 
             box.innerHTML = `
-                <p>Frame ${f.frame_index}</p>
+                <p><strong>Frame ${f.frame_index}</strong></p>
+               
                 <div class="comp-box">
-                    <h4>{{ t.detected_face }}</h4>
-                    <img src="data:image/jpeg;base64,${f.face_base64}" class="face-img" onerror="console.error('Failed to load face image')">
+                    <h4>Detected Face</h4>
+                    <img src="data:image/jpeg;base64,${f.face_base64}" class="face-img" alt="Face frame ${f.frame_index}" onerror="console.error('Failed to load face image')">
                 </div>
+               
                 <div class="comp-box">
-                    <h4>{{ t.heatmap }}</h4>
-                    <img src="data:image/jpeg;base64,${f.heatmap_base64}" class="face-img" onerror="console.error('Failed to load heatmap image')">
+                    <h4>Heatmap</h4>
+                    <img src="data:image/jpeg;base64,${f.heatmap_base64}" class="face-img" alt="Heatmap ${f.frame_index}" onerror="console.error('Failed to load heatmap image')">
                 </div>
-                <p class="confidence-label">{{ t.confidence }}: ${(f.confidence * 100).toFixed(2)}%</p>
+               
+                <p class="confidence-label">Confidence: ${(f.confidence * 100).toFixed(2)}%</p>
+               
+                ${summaryHTML}
+                ${featuresHTML}
             `;
             framesGallery.appendChild(box);
         });
@@ -175,7 +312,7 @@ function renderResults(data) {
     }
 }
 
-/* UPLOAD CLICK - DEBUG VERSION */
+/* UPLOAD CLICK (Giữ hiển thị tên file) */
 uploadBtn.addEventListener("click", async () => {
     const file = videoInput.files[0];
     if (!file) {
@@ -264,7 +401,8 @@ uploadBtn.addEventListener("click", async () => {
         renderResults(data);
 
         currentTempId = data.temp_id;
-        notifyFilename.textContent = currentFilename;
+        currentFilename = file.name;  // Lưu tên file để hiển thị
+        notifyFilename.textContent = currentFilename;  // Hiển thị tên file trong notify
         saveHistoryNotification.style.display = "flex";
 
         console.log("=== UPLOAD DEBUG END - SUCCESS ===");
@@ -323,7 +461,7 @@ async function handleSaveHistory(save) {
 notifySaveBtn.addEventListener("click", () => handleSaveHistory(true));
 notifyDiscardBtn.addEventListener("click", () => handleSaveHistory(false));
 
-// Thêm event listener để theo dõi network errors
+// Event listeners for errors
 window.addEventListener('unhandledrejection', event => {
     console.error('Unhandled promise rejection:', event.reason);
 });
